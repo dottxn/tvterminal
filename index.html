@@ -1149,6 +1149,7 @@ window.addEventListener('resize', () => fitAddon.fit());
 // ── STATE ─────────────────────────────────────────────────
 let countdownInterval = null;
 let slotEnd = null;
+let slotEndedFired = false;
 let selectedDur = 1;
 let myNick = null;
 let chatChannel = null;
@@ -1182,6 +1183,7 @@ async function connectAbly(nick) {
     liveChannel = ablyClient.channels.get('tvt:live');
     liveChannel.subscribe('frame', msg => renderFrame(msg.data));
     liveChannel.subscribe('slot_start', msg => {
+      slotEndedFired = false;
       const d = msg.data;
       hideIdle();
       showLive(d.streamer_name, d.streamer_url, d.slot_end);
@@ -1317,10 +1319,11 @@ async function refreshQueue() {
     document.getElementById('queue-stats').textContent = `${data.total_queued || 0} queued`;
 
     if (data.live) {
+      slotEndedFired = false;
       showLive(data.live.streamer_name, data.live.streamer_url, data.live.slot_end);
       hideIdle();
     } else {
-      showIdle();
+      showIdle(); // silent — no terminal messages
     }
 
     const qList = document.getElementById('queue-list');
@@ -1351,6 +1354,20 @@ function showLive(name, url, end) {
   if (end) { slotEnd = new Date(end); startCountdown(); }
 }
 
+function handleSlotEnd() {
+  if (slotEndedFired) return;
+  slotEndedFired = true;
+  slotEnd = null;
+  clearInterval(countdownInterval);
+  document.getElementById('countdown').textContent = '';
+  term.writeln('');
+  term.writeln('\x1b[33m● slot ended\x1b[0m');
+  term.writeln('\x1b[90mchannel is dark. next broadcast coming soon.\x1b[0m');
+  addSystemMsg('slot ended — channel is dark');
+  showIdle();
+  setTimeout(refreshQueue, 1500); // single delayed refresh, not immediate race
+}
+
 function showIdle() {
   document.getElementById('on-air').classList.remove('visible');
   document.getElementById('streamer-name').style.color = 'var(--muted)';
@@ -1375,14 +1392,8 @@ function startCountdown() {
       `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')} remaining`;
     if (s <= 0) {
       clearInterval(countdownInterval);
-      // Don't wait for the cron or Ably event — expire client-side immediately
       document.getElementById('countdown').textContent = '';
-      term.writeln('');
-      term.writeln('\x1b[33m● slot ended\x1b[0m');
-      term.writeln('\x1b[90mchannel is dark. next broadcast coming soon.\x1b[0m');
-      addSystemMsg('slot ended — channel is dark');
-      showIdle();
-      refreshQueue();
+      handleSlotEnd();
     }
   }, 500);
 }

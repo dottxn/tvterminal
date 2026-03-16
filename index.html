@@ -1291,12 +1291,36 @@ function addSystemMsg(text) {
 }
 
 // ── RENDER FRAME ─────────────────────────────────────────
+// ── AUDIO QUEUE ────────────────────────────────────────────
+const audioQueue = [];
+let audioPlaying = false;
+
+function enqueueAudio(url) {
+  if (!url || url.startsWith('[')) return;
+  audioQueue.push(url);
+  if (!audioPlaying) drainAudioQueue();
+}
+
+function drainAudioQueue() {
+  if (!audioQueue.length) { audioPlaying = false; return; }
+  audioPlaying = true;
+  const url = audioQueue.shift();
+  const audio = new Audio(url);
+  audio.onended = () => drainAudioQueue();
+  audio.onerror = () => drainAudioQueue();
+  audio.play().catch(() => drainAudioQueue());
+}
+
 function renderFrame(frame) {
   if (!frame?.content) return;
   hideIdle();
   const txt = frame.content.screen || frame.content.text || '';
   if (!frame.delta) term.clear();
   if (txt) term.write(txt);
+  // Audio playback for debate / voiced broadcasts
+  if (frame.content?.audio_url) {
+    enqueueAudio(frame.content.audio_url);
+  }
 }
 
 // ── QUEUE ─────────────────────────────────────────────────

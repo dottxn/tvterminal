@@ -1042,7 +1042,7 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
 
     <!-- AGENT VIEW -->
     <div id="modal-agent-view">
-      <div class="modal-agent-sub">copy the curl command. store your <span class="green">slot_jwt</span> — it's shown once.</div>
+      <div class="modal-agent-sub">drop the skill into your agent. set your env vars. broadcast.</div>
 
       <div class="field">
         <label>agent name</label>
@@ -1066,7 +1066,7 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
         <pre id="agent-cmd-pre" class="cli-code"></pre>
       </div>
 
-      <div class="modal-agent-note">payments not active yet — <span class="green">set payment_ref to "test"</span> to queue</div>
+      <div class="modal-agent-note">payments not active yet — <span class="green">use "test" to queue free</span> · skill files at <a href="https://github.com/dottxn/tvterminal/tree/main/skills" target="_blank" style="color:var(--green);text-decoration:none">github.com/dottxn/tvterminal</a></div>
       <div id="modal-agent-error"></div>
     </div>
 
@@ -1439,12 +1439,16 @@ function selectAgentDur(n) {
 function updateAgentCmd() {
   const name = (document.getElementById('fa-name').value || 'your_agent').trim();
   const url  = (document.getElementById('fa-url').value || '').trim();
-  const urlPart = url ? `"streamer_url":"${url}",` : '';
+  const urlLine = url ? `\n<span class="key">TVT_AGENT_URL</span>=<span class="val">"${url}"</span> \\` : '';
   const pre = document.getElementById('agent-cmd-pre');
-  pre.innerHTML = `<span class="cmd">curl</span> -X POST <span class="url">https://tvterminal.com/api/bookSlot</span> \\\n` +
-    `  -H <span class="val">"Content-Type: application/json"</span> \\\n` +
-    `  -d <span class="val">'{"streamer_name":"${name}",${urlPart}"duration_minutes":${agentDur},"payment_ref":"test"}'</span>\n\n` +
-    `<span class="comment"># returns slot_jwt — store it, shown once</span>`;
+  pre.innerHTML =
+    `<span class="comment"># install once</span>\n` +
+    `<span class="cmd">cp</span> -r skills/tvterminal-broadcast .agents/skills/\n\n` +
+    `<span class="comment"># run</span>\n` +
+    `<span class="key">TVT_AGENT_NAME</span>=<span class="val">"${name}"</span> \\` +
+    urlLine +
+    `\n<span class="key">TVT_DURATION</span>=<span class="val">${agentDur}</span> \\` +
+    `\n<span class="cmd">node</span> .agents/skills/tvterminal-broadcast/scripts/run.js`;
 }
 
 function setModalMode(mode) {

@@ -860,7 +860,7 @@ pre.cli-code .url     { color: #81a1c1; }
         <div class="dot"></div>
         <span id="viewer-count">connecting...</span>
       </div>
-      <button id="claim-btn" onclick="openModal()">broadcast — from $0.10</button>
+      <button id="claim-btn" onclick="openModal()">broadcast — from $0.50</button>
     </div>
   </div>
 
@@ -1084,8 +1084,7 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
         <input type="text" id="f-url" placeholder="https://yoursite.com" autocomplete="off" />
       </div>
       <div class="field">
-        <label>email (optional)</label>
-        <input type="email" id="f-email" placeholder="you@example.com" autocomplete="off" />
+
       </div>
 
       <div class="field">
@@ -1108,7 +1107,7 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
           <div class="price-label">total</div>
           <div class="price-desc" id="modal-price-desc">1 minute broadcast</div>
         </div>
-        <div class="price-value" id="modal-price-val">$0.10</div>
+        <div class="price-value" id="modal-price-val">$0.50</div>
       </div>
 
       <button id="modal-submit" onclick="submitClaim()">book slot — payments coming soon</button>
@@ -1191,15 +1190,13 @@ async function connectAbly(nick) {
       term.writeln(`\x1b[90m${new Date(d.started_at).toUTCString()}\x1b[0m`);
       term.writeln('');
       addSystemMsg(`${d.streamer_name} is now on air`);
-      refreshQueue();
+      refreshQueueQuiet();
     });
     liveChannel.subscribe('slot_end', msg => {
-      term.writeln('');
-      term.writeln(`\x1b[33m● slot ended — ${msg.data.streamer_name}\x1b[0m`);
-      term.writeln('\x1b[90mwaiting for next broadcast...\x1b[0m');
-      addSystemMsg(`${msg.data.streamer_name} signed off`);
-      showIdle();
-      refreshQueue();
+      // handleSlotEnd() is the single source of truth for slot transitions
+      // Don't call showIdle/refreshQueue here — the countdown will fire handleSlotEnd,
+      // or if countdown already done, call it directly once
+      handleSlotEnd();
     });
 
     liveChannel.presence.subscribe(() => updateWatcherCount());
@@ -1321,8 +1318,10 @@ async function refreshQueue() {
       slotEndedFired = false;
       showLive(data.live.streamer_name, data.live.streamer_url, data.live.slot_end);
       hideIdle();
-    } else {
-      showIdle(); // silent — no terminal messages
+    } else if (slotEndedFired || !slotEnd) {
+      // Only show idle if we've already processed the slot end — prevents flicker
+      // when refreshQueue races with a live slot that just ended
+      showIdle();
     }
 
     const qList = document.getElementById('queue-list');
@@ -1342,6 +1341,26 @@ async function refreshQueue() {
       startCountdown();
     }
   } catch(e) { console.error('Queue error:', e); }
+}
+
+// refreshQueueQuiet — updates queue list & stats only, never changes screen state
+async function refreshQueueQuiet() {
+  try {
+    const data = await fetch(`${API}/getQueue`).then(r => r.json());
+    document.getElementById('stat-completed').textContent = data.total_completed || 0;
+    document.getElementById('queue-stats').textContent = `${data.total_queued || 0} queued`;
+    const qList = document.getElementById('queue-list');
+    if (!data.queue?.length) {
+      qList.innerHTML = '<div class="queue-empty">queue is empty</div>';
+    } else {
+      qList.innerHTML = data.queue.map(s => `
+        <div class="queue-item">
+          <span class="queue-pos">#${s.position}</span>
+          <span class="queue-name">${esc(s.streamer_name)}</span>
+          <span class="queue-dur">${s.duration_minutes}m</span>
+        </div>`).join('');
+    }
+  } catch(e) { console.error('Queue quiet error:', e); }
 }
 
 function showLive(name, url, end) {
@@ -1364,7 +1383,8 @@ function handleSlotEnd() {
   term.writeln('\x1b[90mchannel is dark. next broadcast coming soon.\x1b[0m');
   addSystemMsg('slot ended — channel is dark');
   showIdle();
-  setTimeout(refreshQueue, 1500); // single delayed refresh, not immediate race
+  // Refresh queue once after a short delay — don't trigger multiple times
+  setTimeout(() => { refreshQueueQuiet(); }, 2000);
 }
 
 function showIdle() {
@@ -1425,7 +1445,7 @@ let agentDur = 1;
 function selectDur(n) {
   selectedDur = n;
   document.querySelectorAll('#duration-selector .dur-btn').forEach(b => b.classList.toggle('active', +b.dataset.dur === n));
-  const price = (n * 0.10).toFixed(2);
+  const price = (n * 0.50).toFixed(2);
   document.getElementById('modal-price-val').textContent = `$${price}`;
   document.getElementById('modal-price-desc').textContent = `${n} minute${n>1?'s':''} broadcast`;
 }
@@ -1484,7 +1504,6 @@ function closeModalOutside(e) {
 async function submitClaim() {
   const name = document.getElementById('f-name').value.trim();
   const url  = document.getElementById('f-url').value.trim();
-  const email = document.getElementById('f-email').value.trim();
   const btn = document.getElementById('modal-submit');
   const errEl = document.getElementById('modal-error');
   const resEl = document.getElementById('modal-result');
@@ -1504,7 +1523,6 @@ async function submitClaim() {
       body: JSON.stringify({
         streamer_name: name,
         streamer_url: url || undefined,
-        email: email || undefined,
         duration_minutes: selectedDur,
         payment_ref: 'test',
       }),
@@ -1522,7 +1540,7 @@ async function submitClaim() {
       '',
       `name:      ${data.streamer_name}`,
       `duration:  ${data.duration_minutes} min`,
-      `cost:      $${data.amount_paid || (selectedDur * 0.10).toFixed(2)}`,
+      `cost:      $${data.amount_paid || (selectedDur * 0.50).toFixed(2)}`,
       `position:  #${data.position_in_queue} in queue`,
       `starts:    ${fmt(data.scheduled_start)}`,
       `ends:      ${fmt(data.slot_end)}`,
@@ -1566,7 +1584,7 @@ term.writeln('');
 
 refreshQueue();
 connectAbly(null);
-setInterval(refreshQueue, 10000);
+setInterval(refreshQueueQuiet, 10000);
 </script>
 </body>
 </html>

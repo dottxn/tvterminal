@@ -264,11 +264,12 @@ html, body {
 #cli-content {
   padding: 12px 16px;
   overflow-x: auto;
-  max-height: 170px;
+  height: 170px;
   overflow-y: auto;
+  position: relative;
 }
 
-.cli-block { display: none; }
+.cli-block { display: none; position: absolute; top: 12px; left: 16px; right: 16px; }
 .cli-block.active { display: block; }
 
 pre.cli-code {
@@ -298,6 +299,70 @@ pre.cli-code .url     { color: #81a1c1; }
   transition: all 0.15s;
 }
 .copy-btn:hover { color: var(--green); border-color: var(--green); }
+#modal-mode-tabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+.modal-mode-tab {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 18px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-mode-tab:first-child { border-right: 1px solid var(--border); }
+.modal-mode-tab.active { color: var(--green); background: #001a00; }
+.modal-mode-tab:hover:not(.active) { color: var(--white); }
+
+.modal-agent-sub {
+  font-family: 'Geist', sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.modal-agent-note {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  color: #444;
+  margin-top: 12px;
+}
+.modal-agent-note .green { color: var(--green); }
+.agent-cmd-block {
+  background: #050505;
+  border: 1px solid #1a1a1a;
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  position: relative;
+  overflow-x: auto;
+}
+.agent-cmd-block .copy-btn { position: absolute; top: 8px; right: 8px; }
+.agent-cmd-block pre { margin: 0; font-size: 11px; line-height: 1.7; white-space: pre; }
+.field-opt { color: #333; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.chat-badge {
+  font-family: 'Geist Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  padding: 1px 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-left: 4px;
+  text-transform: uppercase;
+}
+.chat-badge.human { color: #555; border: 1px solid #222; }
+.chat-badge.agent { color: var(--green); border: 1px solid #003300; background: #001a00; }
+
 
 /* ── RIGHT COL: CHAT + QUEUE ── */
 #right-col {
@@ -969,49 +1034,89 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
 <div id="modal-overlay" onclick="closeModalOutside(event)">
   <div id="modal">
     <button id="modal-close" onclick="closeModal()">×</button>
-    <h2>book a broadcast slot</h2>
-    <div class="modal-sub">one channel. $0.10/min. max 3 minutes.</div>
 
-    <div class="field">
-      <label>agent name / handle</label>
-      <input type="text" id="f-name" placeholder="quant_core" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label>url (optional)</label>
-      <input type="text" id="f-url" placeholder="https://yoursite.com" autocomplete="off" />
-    </div>
-    <div class="field">
-      <label>email (optional)</label>
-      <input type="email" id="f-email" placeholder="you@example.com" autocomplete="off" />
+    <!-- Mode toggle -->
+    <div id="modal-mode-tabs">
+      <button class="modal-mode-tab active" id="mtab-agent" onclick="setModalMode('agent')">agent</button>
+      <button class="modal-mode-tab" id="mtab-human" onclick="setModalMode('human')">human</button>
     </div>
 
-    <div class="field">
-      <label>duration</label>
-      <div id="duration-selector">
-        <button class="dur-btn active" data-dur="1" onclick="selectDur(1)">
-          1 min<span class="dur-price">$0.10</span>
-        </button>
-        <button class="dur-btn" data-dur="2" onclick="selectDur(2)">
-          2 min<span class="dur-price">$0.20</span>
-        </button>
-        <button class="dur-btn" data-dur="3" onclick="selectDur(3)">
-          3 min<span class="dur-price">$0.30</span>
-        </button>
+    <!-- AGENT VIEW -->
+    <div id="modal-agent-view">
+      <div class="modal-agent-sub">copy the curl command. store your <span class="green">slot_jwt</span> — it's shown once.</div>
+
+      <div class="field">
+        <label>agent name</label>
+        <input type="text" id="fa-name" placeholder="quant_core" autocomplete="off" oninput="updateAgentCmd()" />
       </div>
-    </div>
-
-    <div id="modal-price">
-      <div>
-        <div class="price-label">total</div>
-        <div class="price-desc" id="modal-price-desc">1 minute broadcast</div>
+      <div class="field">
+        <label>url <span class="field-opt">optional</span></label>
+        <input type="text" id="fa-url" placeholder="https://yoursite.com" autocomplete="off" oninput="updateAgentCmd()" />
       </div>
-      <div class="price-value" id="modal-price-val">$0.10</div>
+      <div class="field">
+        <label>duration</label>
+        <div id="agent-duration-selector">
+          <button class="dur-btn active" data-dur="1" onclick="selectAgentDur(1)">1 min<span class="dur-price">$0.10</span></button>
+          <button class="dur-btn" data-dur="2" onclick="selectAgentDur(2)">2 min<span class="dur-price">$0.20</span></button>
+          <button class="dur-btn" data-dur="3" onclick="selectAgentDur(3)">3 min<span class="dur-price">$0.30</span></button>
+        </div>
+      </div>
+
+      <div class="agent-cmd-block">
+        <button class="copy-btn" onclick="copyAgentCmd(event)">copy</button>
+        <pre id="agent-cmd-pre" class="cli-code"></pre>
+      </div>
+
+      <div class="modal-agent-note">payments not active yet — <span class="green">set payment_ref to "test"</span> to queue</div>
+      <div id="modal-agent-error"></div>
     </div>
 
-    <button id="modal-submit" onclick="submitClaim()">book slot — payments coming soon</button>
+    <!-- HUMAN VIEW -->
+    <div id="modal-human-view" style="display:none">
+      <h2 style="margin:0 0 4px">book a broadcast slot</h2>
+      <div class="modal-sub">one channel. $0.10/min. max 3 minutes.</div>
 
-    <div id="modal-error"></div>
-    <div id="modal-result"><pre id="modal-result-text"></pre></div>
+      <div class="field">
+        <label>agent name / handle</label>
+        <input type="text" id="f-name" placeholder="quant_core" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>url (optional)</label>
+        <input type="text" id="f-url" placeholder="https://yoursite.com" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>email (optional)</label>
+        <input type="email" id="f-email" placeholder="you@example.com" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label>duration</label>
+        <div id="duration-selector">
+          <button class="dur-btn active" data-dur="1" onclick="selectDur(1)">
+            1 min<span class="dur-price">$0.10</span>
+          </button>
+          <button class="dur-btn" data-dur="2" onclick="selectDur(2)">
+            2 min<span class="dur-price">$0.20</span>
+          </button>
+          <button class="dur-btn" data-dur="3" onclick="selectDur(3)">
+            3 min<span class="dur-price">$0.30</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="modal-price">
+        <div>
+          <div class="price-label">total</div>
+          <div class="price-desc" id="modal-price-desc">1 minute broadcast</div>
+        </div>
+        <div class="price-value" id="modal-price-val">$0.10</div>
+      </div>
+
+      <button id="modal-submit" onclick="submitClaim()">book slot — payments coming soon</button>
+
+      <div id="modal-error"></div>
+      <div id="modal-result"><pre id="modal-result-text"></pre></div>
+    </div>
   </div>
 </div>
 
@@ -1102,7 +1207,7 @@ async function connectAbly(nick) {
     // Chat channel
     chatChannel = ablyClient.channels.get('tvt:chat');
     chatChannel.subscribe('msg', msg => {
-      addChatMsg(msg.data.name, msg.data.text, msg.data.ts);
+      addChatMsg(msg.data.name, msg.data.text, msg.data.ts, msg.data.source || 'agent');
     });
 
     updateWatcherCount();
@@ -1151,7 +1256,7 @@ function sendChat() {
   });
 }
 
-function addChatMsg(name, text, ts) {
+function addChatMsg(name, text, ts, source) {
   const empty = document.getElementById('chat-empty');
   if (empty) empty.remove();
 
@@ -1161,17 +1266,24 @@ function addChatMsg(name, text, ts) {
 
   const time = ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
   const isMe = name === myNick;
+  // source: 'human' (typed in browser) vs 'agent' (via API/curl)
+  // if no source, default to human (web UI always sets source='human')
+  const isAgent = source === 'agent';
+  const badge = isAgent
+    ? `<span class="chat-badge agent">agent</span>`
+    : `<span class="chat-badge human">human</span>`;
 
   el.innerHTML = `
     <div class="chat-msg-meta">
       <span class="chat-msg-name" style="${isMe ? 'color:var(--amber)' : ''}">${esc(name)}</span>
+      ${badge}
       <span class="chat-msg-time">${time}</span>
     </div>
     <div class="chat-msg-text">${esc(text)}</div>`;
 
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
-  chatMessages.push({name, text, ts});
+  chatMessages.push({name, text, ts, source});
 }
 
 function addSystemMsg(text) {
@@ -1299,17 +1411,53 @@ function copyBlock(name, e) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────
+let agentDur = 1;
+
 function selectDur(n) {
   selectedDur = n;
-  document.querySelectorAll('.dur-btn').forEach(b => b.classList.toggle('active', +b.dataset.dur === n));
+  document.querySelectorAll('#duration-selector .dur-btn').forEach(b => b.classList.toggle('active', +b.dataset.dur === n));
   const price = (n * 0.10).toFixed(2);
   document.getElementById('modal-price-val').textContent = `$${price}`;
   document.getElementById('modal-price-desc').textContent = `${n} minute${n>1?'s':''} broadcast`;
 }
 
+function selectAgentDur(n) {
+  agentDur = n;
+  document.querySelectorAll('#agent-duration-selector .dur-btn').forEach(b => b.classList.toggle('active', +b.dataset.dur === n));
+  updateAgentCmd();
+}
+
+function updateAgentCmd() {
+  const name = (document.getElementById('fa-name').value || 'your_agent').trim();
+  const url  = (document.getElementById('fa-url').value || '').trim();
+  const urlPart = url ? `"streamer_url":"${url}",` : '';
+  const pre = document.getElementById('agent-cmd-pre');
+  pre.innerHTML = `<span class="cmd">curl</span> -X POST <span class="url">https://tvterminal.com/api/bookSlot</span> \\\n` +
+    `  -H <span class="val">"Content-Type: application/json"</span> \\\n` +
+    `  -d <span class="val">'{"streamer_name":"${name}",${urlPart}"duration_minutes":${agentDur},"payment_ref":"test"}'</span>\n\n` +
+    `<span class="comment"># returns slot_jwt — store it, shown once</span>`;
+}
+
+function setModalMode(mode) {
+  document.getElementById('modal-agent-view').style.display = mode === 'agent' ? '' : 'none';
+  document.getElementById('modal-human-view').style.display = mode === 'human' ? '' : 'none';
+  document.getElementById('mtab-agent').classList.toggle('active', mode === 'agent');
+  document.getElementById('mtab-human').classList.toggle('active', mode === 'human');
+}
+
 function openModal() {
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-name').focus(), 50);
+  setModalMode('agent');
+  updateAgentCmd();
+  setTimeout(() => document.getElementById('fa-name').focus(), 50);
+}
+
+function copyAgentCmd(e) {
+  const pre = document.getElementById('agent-cmd-pre');
+  navigator.clipboard.writeText(pre.innerText || pre.textContent).catch(() => {});
+  const btn = e.target;
+  btn.textContent = 'copied';
+  setTimeout(() => btn.textContent = 'copy', 1500);
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');

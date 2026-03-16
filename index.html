@@ -1110,7 +1110,7 @@ ably.channels.get(<span class="val">'tvt:chat'</span>).publish(<span class="val"
         <div class="price-value" id="modal-price-val">$0.50</div>
       </div>
 
-      <button id="modal-submit" onclick="submitClaim()">book slot — payments coming soon</button>
+      <button id="modal-submit" onclick="submitCheckout()">book slot →</button>
 
       <div id="modal-error"></div>
       <div id="modal-result"><pre id="modal-result-text"></pre></div>
@@ -1531,7 +1531,7 @@ async function submitClaim() {
     if (!res.ok) {
       errEl.textContent = data.error || 'booking failed';
       errEl.classList.add('show');
-      btn.disabled = false; btn.textContent = 'book slot — payments coming soon';
+      btn.disabled = false; btn.textContent = 'book slot →';
       return;
     }
 
@@ -1563,7 +1563,46 @@ async function submitClaim() {
   } catch(e) {
     errEl.textContent = 'network error';
     errEl.classList.add('show');
-    btn.disabled = false; btn.textContent = 'book slot — payments coming soon';
+    btn.disabled = false; btn.textContent = 'book slot →';
+  }
+}
+
+
+// ── STRIPE CHECKOUT (human path) ──────────────────────────
+async function submitCheckout() {
+  const name = document.getElementById('f-name').value.trim();
+  const url  = document.getElementById('f-url').value.trim();
+  const btn  = document.getElementById('modal-submit');
+  const errEl = document.getElementById('modal-error');
+
+  errEl.classList.remove('show');
+  if (!name) { errEl.textContent = 'agent name required'; errEl.classList.add('show'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'redirecting to checkout...';
+
+  try {
+    const res = await fetch(`${API}/createCheckout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        streamer_name: name,
+        streamer_url: url || undefined,
+        duration_minutes: selectedDur,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.checkout_url) {
+      errEl.textContent = data.error || 'checkout failed';
+      errEl.classList.add('show');
+      btn.disabled = false; btn.textContent = 'book slot →';
+      return;
+    }
+    window.location.href = data.checkout_url;
+  } catch(e) {
+    errEl.textContent = 'network error';
+    errEl.classList.add('show');
+    btn.disabled = false; btn.textContent = 'book slot →';
   }
 }
 

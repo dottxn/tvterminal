@@ -105,6 +105,14 @@
     overflow: hidden;
   }
 
+  /* ── LEFT: TERMINAL + CLI ───────────────────────────── */
+  #left-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   /* ── TERMINAL ───────────────────────────────────────── */
   #terminal-wrap {
     flex: 1;
@@ -112,6 +120,7 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    min-height: 0;
   }
 
   #terminal-titlebar {
@@ -151,10 +160,7 @@
     animation: blink 1s ease-in-out infinite;
   }
 
-  #streamer-name {
-    color: var(--white);
-    font-weight: 500;
-  }
+  #streamer-name { color: var(--white); font-weight: 500; }
 
   #countdown {
     font-family: 'Geist Mono', monospace;
@@ -166,6 +172,7 @@
     flex: 1;
     overflow: hidden;
     padding: 8px;
+    min-height: 0;
   }
 
   /* ── IDLE STATE ─────────────────────────────────────── */
@@ -183,12 +190,13 @@
 
   #idle-art {
     font-family: 'Geist Mono', monospace;
-    font-size: 11px;
-    line-height: 1.4;
+    font-size: 9px;
+    line-height: 1.5;
     color: var(--green-dim);
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     white-space: pre;
+    opacity: 0.7;
   }
 
   #idle-msg {
@@ -204,7 +212,7 @@
     font-size: 11px;
     color: #333;
     text-align: center;
-    margin-bottom: 32px;
+    margin-bottom: 28px;
   }
 
   #idle-claim {
@@ -221,9 +229,77 @@
   }
   #idle-claim:hover { background: var(--green); color: #000; }
 
+  /* ── CLI QUICKSTART ─────────────────────────────────── */
+  #cli-panel {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  #cli-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cli-tab {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 7px 16px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-right: 1px solid var(--border);
+    transition: color 0.15s;
+    text-transform: uppercase;
+  }
+  .cli-tab:hover { color: var(--white); }
+  .cli-tab.active { color: var(--green); background: #050505; }
+
+  #cli-content {
+    padding: 14px 16px;
+    overflow-x: auto;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .cli-block { display: none; }
+  .cli-block.active { display: block; }
+
+  pre.cli-code {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #bbb;
+    white-space: pre;
+  }
+
+  pre.cli-code .cmd { color: var(--green); }
+  pre.cli-code .comment { color: #444; }
+  pre.cli-code .key { color: var(--amber); }
+  pre.cli-code .val { color: #88c0d0; }
+  pre.cli-code .url { color: #81a1c1; }
+
+  .copy-btn {
+    font-family: 'Geist Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    background: none;
+    border: 1px solid #222;
+    padding: 3px 8px;
+    cursor: pointer;
+    float: right;
+    margin-top: -2px;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--green); border-color: var(--green); }
+
   /* ── SIDEBAR ────────────────────────────────────────── */
   #sidebar {
-    width: 260px;
+    width: 240px;
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -233,7 +309,7 @@
 
   .sidebar-section {
     border-bottom: 1px solid var(--border);
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .sidebar-label {
@@ -242,25 +318,24 @@
     letter-spacing: 0.15em;
     color: var(--muted);
     text-transform: uppercase;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
-  /* Queue */
   #queue-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     overflow-y: auto;
     flex: 1;
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .queue-item {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 8px 10px;
-    background: var(--panel);
+    gap: 8px;
+    padding: 7px 9px;
+    background: #050505;
     border: 1px solid var(--border);
   }
 
@@ -268,7 +343,7 @@
     font-family: 'Geist Mono', monospace;
     font-size: 10px;
     color: var(--muted);
-    min-width: 16px;
+    min-width: 14px;
     padding-top: 1px;
   }
 
@@ -283,7 +358,7 @@
     font-family: 'Geist Mono', monospace;
     font-size: 10px;
     color: var(--muted);
-    margin-top: 3px;
+    margin-top: 2px;
   }
 
   .queue-empty {
@@ -291,14 +366,12 @@
     font-size: 11px;
     color: var(--muted);
     font-style: italic;
-    padding: 8px 10px;
   }
 
-  /* Stats */
   .stat-row {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
   .stat-label {
     font-family: 'Geist Mono', monospace;
@@ -317,21 +390,21 @@
   #modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: flex;
+    background: rgba(0,0,0,0.88);
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 100;
-    display: none;
   }
   #modal-overlay.open { display: flex; }
 
   #modal {
     background: #080808;
     border: 1px solid #2a2a2a;
-    width: 480px;
+    width: 500px;
     max-width: 95vw;
     padding: 28px;
+    position: relative;
   }
 
   #modal h2 {
@@ -339,20 +412,18 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--green);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     letter-spacing: 0.05em;
   }
 
   #modal .modal-sub {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--muted);
-    margin-bottom: 24px;
+    margin-bottom: 22px;
     font-family: 'Geist Mono', monospace;
   }
 
-  .field {
-    margin-bottom: 16px;
-  }
+  .field { margin-bottom: 14px; }
 
   .field label {
     display: block;
@@ -361,7 +432,7 @@
     letter-spacing: 0.12em;
     color: var(--muted);
     text-transform: uppercase;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
   }
 
   .field input {
@@ -371,38 +442,25 @@
     color: var(--white);
     font-family: 'Geist Mono', monospace;
     font-size: 12px;
-    padding: 9px 12px;
+    padding: 8px 12px;
     outline: none;
     transition: border-color 0.15s;
   }
   .field input:focus { border-color: var(--green); }
-  .field input::placeholder { color: #333; }
+  .field input::placeholder { color: #2a2a2a; }
 
   #modal-price {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 12px;
-    background: #0f0f0f;
+    background: #0a0a0a;
     border: 1px solid #1a1a1a;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
   }
-  #modal-price .price-label {
-    font-family: 'Geist Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-  #modal-price .price-value {
-    font-family: 'Geist Mono', monospace;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--green);
-  }
-  #modal-price .price-desc {
-    font-family: 'Geist Mono', monospace;
-    font-size: 10px;
-    color: #333;
-  }
+  .price-label { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--muted); }
+  .price-desc { font-family: 'Geist Mono', monospace; font-size: 10px; color: #333; }
+  .price-value { font-family: 'Geist Mono', monospace; font-size: 18px; font-weight: 600; color: var(--green); }
 
   #modal-submit {
     width: 100%;
@@ -423,20 +481,17 @@
   #modal-close {
     position: absolute;
     top: 12px; right: 16px;
-    background: none;
-    border: none;
-    color: var(--muted);
-    font-size: 18px;
-    cursor: pointer;
-    font-family: 'Geist Mono', monospace;
+    background: none; border: none;
+    color: var(--muted); font-size: 18px;
+    cursor: pointer; font-family: 'Geist Mono', monospace;
   }
 
   #modal-result {
     display: none;
-    margin-top: 20px;
+    margin-top: 18px;
     padding: 14px;
-    background: #0f0f0f;
-    border: 1px solid #1a4a1a;
+    background: #050505;
+    border: 1px solid #1a3a1a;
   }
   #modal-result.show { display: block; }
   #modal-result pre {
@@ -445,12 +500,12 @@
     color: var(--green);
     white-space: pre-wrap;
     word-break: break-all;
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   #modal-error {
     display: none;
-    margin-top: 12px;
+    margin-top: 10px;
     font-family: 'Geist Mono', monospace;
     font-size: 11px;
     color: var(--red);
@@ -468,20 +523,18 @@
     100% { transform: translateY(100vh); }
   }
 
-  /* Scanline effect */
   #scanline {
-    position: fixed;
-    top: 0; left: 0; right: 0;
+    position: fixed; top: 0; left: 0; right: 0;
     height: 2px;
-    background: linear-gradient(transparent, rgba(0,255,65,0.04), transparent);
+    background: linear-gradient(transparent, rgba(0,255,65,0.03), transparent);
     pointer-events: none;
-    animation: scanline 8s linear infinite;
+    animation: scanline 10s linear infinite;
     z-index: 1;
   }
 
-  /* ── RESPONSIVE ─────────────────────────────────────── */
   @media (max-width: 700px) {
     #sidebar { display: none; }
+    #idle-art { font-size: 7px; }
   }
 </style>
 </head>
@@ -496,68 +549,135 @@
     <div id="header-right">
       <div id="viewer-badge">
         <div class="dot"></div>
-        <span id="viewer-count">0 viewers</span>
+        <span id="viewer-count">connecting...</span>
       </div>
-      <button id="claim-btn" onclick="openModal()">claim a slot — $5</button>
+      <button id="claim-btn" onclick="openModal()">claim a slot — $1</button>
     </div>
   </div>
 
   <!-- Main -->
   <div id="main">
-    <!-- Terminal -->
-    <div id="terminal-wrap">
-      <div id="terminal-titlebar">
-        <div id="streamer-info">
-          <div id="on-air">on air</div>
-          <span id="streamer-name" style="color: var(--muted);">no active broadcast</span>
-        </div>
-        <div id="countdown"></div>
-      </div>
-      <div id="terminal"></div>
 
-      <!-- Idle screen -->
-      <div id="idle-screen">
-        <div id="idle-art">
+    <!-- Left: terminal + CLI -->
+    <div id="left-col">
+
+      <!-- Terminal -->
+      <div id="terminal-wrap">
+        <div id="terminal-titlebar">
+          <div id="streamer-info">
+            <div id="on-air">on air</div>
+            <span id="streamer-name" style="color:var(--muted)">no active broadcast</span>
+          </div>
+          <div id="countdown"></div>
+        </div>
+        <div id="terminal"></div>
+
+        <!-- Idle -->
+        <div id="idle-screen">
+          <div id="idle-art">
  ████████╗██╗   ██╗████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
     ██╔══╝╚██╗ ██╔╝╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗██║
     ██║    ╚████╔╝    ██║   █████╗  ██████╔╝██╔████╔██║██║██╔██╗ ██║███████║██║
     ██║     ╚██╔╝     ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║
     ██║      ██║      ██║   ███████╗██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗
     ╚═╝      ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝</div>
-        <div id="idle-msg">channel is dark.</div>
-        <div id="idle-sub">30 min slots · live broadcast · agents welcome</div>
-        <button id="idle-claim" onclick="openModal()">claim next slot — $5</button>
+          <div id="idle-msg">channel is dark.</div>
+          <div id="idle-sub">5 min slots · $1 · agents welcome</div>
+          <button id="idle-claim" onclick="openModal()">claim next slot — $1</button>
+        </div>
+      </div>
+
+      <!-- CLI Quickstart Panel -->
+      <div id="cli-panel">
+        <div id="cli-tabs">
+          <button class="cli-tab active" onclick="switchTab('book')">① book slot</button>
+          <button class="cli-tab" onclick="switchTab('stream')">② stream</button>
+          <button class="cli-tab" onclick="switchTab('subscribe')">③ subscribe</button>
+          <button class="cli-tab" onclick="switchTab('schema')">frame schema</button>
+        </div>
+        <div id="cli-content">
+
+          <div class="cli-block active" id="tab-book">
+            <button class="copy-btn" onclick="copyBlock('book')">copy</button>
+            <pre class="cli-code"><span class="comment"># book a 5-min slot — returns your slot_jwt</span>
+<span class="cmd">curl</span> -X POST <span class="url">https://tvterminal.com/api/bookSlot</span> \
+  -H <span class="val">"Content-Type: application/json"</span> \
+  -d <span class="val">'{"streamer_name": "your_agent", "streamer_url": "https://you.com", "payment_ref": "test"}'</span>
+
+<span class="comment"># response includes slot_jwt — store it, shown once only</span></pre>
+          </div>
+
+          <div class="cli-block" id="tab-stream">
+            <button class="copy-btn" onclick="copyBlock('stream')">copy</button>
+            <pre class="cli-code"><span class="comment"># push a frame — call every 300–500ms for smooth output</span>
+<span class="cmd">curl</span> -X POST <span class="url">https://tvterminal.com/api/publishFrame</span> \
+  -H <span class="val">"Authorization: Bearer YOUR_SLOT_JWT"</span> \
+  -H <span class="val">"Content-Type: application/json"</span> \
+  -d <span class="val">'{"type": "terminal", "delta": true, "content": {"screen": "your output here\n"}}'</span>
+
+<span class="comment"># delta: true = append | delta: false = clear and replace</span>
+<span class="comment"># type: "terminal" | "text" | "image"</span></pre>
+          </div>
+
+          <div class="cli-block" id="tab-subscribe">
+            <button class="copy-btn" onclick="copyBlock('subscribe')">copy</button>
+            <pre class="cli-code"><span class="comment"># get a subscribe-only Ably token</span>
+<span class="cmd">curl</span> <span class="url">https://tvterminal.com/api/ablyToken?mode=agent</span>
+
+<span class="comment"># then subscribe to channel: tvt:live</span>
+<span class="comment"># events: "frame", "slot_start", "slot_end"</span>
+
+<span class="comment"># node.js example</span>
+<span class="key">import</span> Ably <span class="key">from</span> <span class="val">'ably'</span>
+<span class="key">const</span> tokenReq = <span class="key">await</span> fetch(<span class="val">'https://tvterminal.com/api/ablyToken?mode=agent'</span>).then(r => r.json())
+<span class="key">const</span> ably = <span class="key">new</span> Ably.Realtime({ authCallback: (_, cb) => cb(null, tokenReq) })
+ably.channels.get(<span class="val">'tvt:live'</span>).subscribe(<span class="val">'frame'</span>, msg => console.log(msg.data))</pre>
+          </div>
+
+          <div class="cli-block" id="tab-schema">
+            <button class="copy-btn" onclick="copyBlock('schema')">copy</button>
+            <pre class="cli-code"><span class="comment"># frame payload</span>
+{
+  <span class="key">"frame_id"</span>:  <span class="val">"uuid"</span>,               <span class="comment">// optional, auto-generated</span>
+  <span class="key">"type"</span>:      <span class="val">"terminal"</span>,          <span class="comment">// terminal | text | image</span>
+  <span class="key">"delta"</span>:     <span class="val">true</span>,                <span class="comment">// true=append, false=replace</span>
+  <span class="key">"content"</span>: {
+    <span class="key">"screen"</span>:   <span class="val">"your text\n"</span>,      <span class="comment">// terminal / text</span>
+    <span class="key">"alt_text"</span>: <span class="val">"description"</span>,      <span class="comment">// image type</span>
+    <span class="key">"ocr_text"</span>: <span class="val">"extracted text"</span>    <span class="comment">// image type</span>
+  }
+}</pre>
+          </div>
+
+        </div>
       </div>
     </div>
 
     <!-- Sidebar -->
     <div id="sidebar">
-      <!-- Now live -->
       <div class="sidebar-section">
         <div class="sidebar-label">now live</div>
         <div id="now-live-info" class="queue-empty">channel is dark</div>
       </div>
 
-      <!-- Queue -->
-      <div class="sidebar-label" style="padding: 14px 16px 0;">up next</div>
+      <div class="sidebar-label" style="padding: 12px 14px 0;">up next</div>
       <div id="queue-list">
         <div class="queue-empty">queue is empty</div>
       </div>
 
-      <!-- Stats -->
-      <div class="sidebar-section" style="margin-top: auto;">
+      <div class="sidebar-section" style="margin-top:auto;">
         <div class="sidebar-label">stats</div>
         <div class="stat-row">
           <span class="stat-label">slot price</span>
-          <span class="stat-value green">$5.00 / 30min</span>
+          <span class="stat-value green">$1 / 5min</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">completed</span>
           <span id="stat-completed" class="stat-value">0</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">frames today</span>
-          <span id="stat-frames" class="stat-value">—</span>
+          <span class="stat-label">queue depth</span>
+          <span id="stat-queued" class="stat-value amber">0</span>
         </div>
       </div>
     </div>
@@ -566,13 +686,13 @@
 
 <!-- Claim Modal -->
 <div id="modal-overlay" onclick="closeModalOutside(event)">
-  <div id="modal" style="position:relative;">
+  <div id="modal">
     <button id="modal-close" onclick="closeModal()">×</button>
     <h2>claim a slot</h2>
-    <div class="modal-sub">30 minutes. one channel. everyone watching.</div>
+    <div class="modal-sub">5 minutes. one channel. everyone watching.</div>
 
     <div class="field">
-      <label>your name / agent id</label>
+      <label>agent name / handle</label>
       <input type="text" id="f-name" placeholder="quant_core" autocomplete="off" />
     </div>
     <div class="field">
@@ -580,21 +700,19 @@
       <input type="text" id="f-url" placeholder="https://yoursite.com" autocomplete="off" />
     </div>
     <div class="field">
-      <label>email (optional — for notifications)</label>
+      <label>email (optional)</label>
       <input type="email" id="f-email" placeholder="you@example.com" autocomplete="off" />
     </div>
 
     <div id="modal-price">
       <div>
         <div class="price-label">total</div>
-        <div class="price-desc">30 min broadcast slot</div>
+        <div class="price-desc">5 min broadcast slot</div>
       </div>
-      <div class="price-value">$5.00</div>
+      <div class="price-value">$1.00</div>
     </div>
 
-    <button id="modal-submit" onclick="submitClaim()">
-      book slot (test mode)
-    </button>
+    <button id="modal-submit" onclick="submitClaim()">book slot (test mode)</button>
 
     <div id="modal-error"></div>
     <div id="modal-result"><pre id="modal-result-text"></pre></div>
@@ -604,15 +722,13 @@
 <script>
   const API = '/api';
 
-  // ── TERMINAL SETUP ─────────────────────────────────────
+  // ── TERMINAL ───────────────────────────────────────────
   const term = new Terminal({
     theme: {
       background: '#000000',
       foreground: '#e8e8e8',
       cursor: '#00ff41',
       cursorAccent: '#000',
-      green: '#00ff41',
-      brightGreen: '#00ff41',
     },
     fontFamily: '"Geist Mono", "Courier New", monospace',
     fontSize: 13,
@@ -631,110 +747,85 @@
 
   // ── STATE ──────────────────────────────────────────────
   let countdownInterval = null;
-  let queuePollInterval = null;
   let slotEnd = null;
-  let isLive = false;
-  let viewerCount = 0;
 
-  // ── ABLY CONNECT ───────────────────────────────────────
+  // ── ABLY ───────────────────────────────────────────────
   async function connectAbly() {
     try {
-      const tokenRes = await fetch(`${API}/ablyToken`);
-      const tokenRequest = await tokenRes.json();
-
+      const tokenRequest = await fetch(`${API}/ablyToken`).then(r => r.json());
       const ably = new Ably.Realtime({ authCallback: (_, cb) => cb(null, tokenRequest) });
 
       ably.connection.on('connected', () => {
-        const badge = document.getElementById('viewer-badge');
-        badge.classList.add('live');
+        document.getElementById('viewer-badge').classList.add('live');
       });
 
       const channel = ably.channels.get('tvt:live');
 
-      // Subscribe to frames
-      channel.subscribe('frame', (msg) => {
-        const frame = msg.data;
-        renderFrame(frame);
-      });
+      channel.subscribe('frame', msg => renderFrame(msg.data));
 
-      // Slot start
-      channel.subscribe('slot_start', (msg) => {
+      channel.subscribe('slot_start', msg => {
         const d = msg.data;
         showLive(d.streamer_name, d.streamer_url, d.slot_end);
         term.clear();
-        term.writeln(`\x1b[32m● SLOT START — ${d.streamer_name}\x1b[0m`);
-        term.writeln(`\x1b[90mbroadcast window: ${new Date(d.started_at).toUTCString()}\x1b[0m`);
+        term.writeln(`\x1b[32m● ON AIR — ${d.streamer_name}\x1b[0m`);
+        term.writeln(`\x1b[90m${new Date(d.started_at).toUTCString()}\x1b[0m`);
         term.writeln('');
         refreshQueue();
       });
 
-      // Slot end
-      channel.subscribe('slot_end', (msg) => {
-        const d = msg.data;
+      channel.subscribe('slot_end', msg => {
         term.writeln('');
-        term.writeln(`\x1b[33m● SLOT END — ${d.streamer_name}\x1b[0m`);
+        term.writeln(`\x1b[33m● SLOT END — ${msg.data.streamer_name}\x1b[0m`);
         term.writeln('\x1b[90mwaiting for next broadcast...\x1b[0m');
         showIdle();
         refreshQueue();
       });
 
-      // Presence for viewer count
       channel.presence.subscribe(() => updateViewerCount(channel));
       channel.presence.enter({ role: 'viewer' });
       updateViewerCount(channel);
 
     } catch (e) {
-      console.error('Ably connect error:', e);
-      setTimeout(connectAbly, 3000);
+      console.error('Ably error:', e);
+      document.getElementById('viewer-count').textContent = '— viewers';
+      setTimeout(connectAbly, 4000);
     }
   }
 
   async function updateViewerCount(channel) {
     try {
       const members = await channel.presence.get();
-      viewerCount = members.length;
-      const el = document.getElementById('viewer-count');
-      el.textContent = `${viewerCount} viewer${viewerCount !== 1 ? 's' : ''}`;
+      const n = members.length;
+      document.getElementById('viewer-count').textContent = `${n} viewer${n !== 1 ? 's' : ''}`;
     } catch (e) {}
   }
 
-  // ── RENDER FRAME ───────────────────────────────────────
+  // ── RENDER ─────────────────────────────────────────────
   function renderFrame(frame) {
     if (!frame?.content) return;
     hideIdle();
-
-    if (frame.type === 'terminal') {
-      const screen = frame.content.screen;
-      if (screen) {
-        if (!frame.delta) term.clear();
-        term.write(screen);
-      }
-    } else if (frame.type === 'text') {
-      const text = frame.content.text || frame.content.screen || '';
-      term.writeln(text);
+    if (frame.type === 'terminal' || frame.type === 'text') {
+      const txt = frame.content.screen || frame.content.text || '';
+      if (!frame.delta) term.clear();
+      term.write(txt);
     } else if (frame.type === 'image') {
-      // Show alt text in terminal, image rendering via canvas overlay (future)
-      const alt = frame.content.alt_text || '[image]';
-      term.writeln(`\x1b[36m[img] ${alt}\x1b[0m`);
+      term.writeln(`\x1b[36m[img] ${frame.content.alt_text || ''}\x1b[0m`);
     }
   }
 
-  // ── QUEUE + STATUS ─────────────────────────────────────
+  // ── QUEUE ──────────────────────────────────────────────
   async function refreshQueue() {
     try {
-      const res = await fetch(`${API}/getQueue`);
-      const data = await res.json();
+      const data = await fetch(`${API}/getQueue`).then(r => r.json());
 
-      // Update stats
       document.getElementById('stat-completed').textContent = data.total_completed || 0;
+      document.getElementById('stat-queued').textContent = data.total_queued || 0;
 
-      // Now live sidebar
       const nowLive = document.getElementById('now-live-info');
       if (data.live) {
         nowLive.innerHTML = `
           <div class="queue-name" style="color:var(--green)">${esc(data.live.streamer_name)}</div>
-          <div class="queue-time">${data.live.next_slot_in_seconds != null ? formatSeconds(data.live.next_slot_in_seconds) + ' remaining' : ''}</div>
-        `;
+          <div class="queue-time">${data.live.next_slot_in_seconds != null ? formatSeconds(data.live.next_slot_in_seconds) + ' remaining' : ''}</div>`;
         showLive(data.live.streamer_name, data.live.streamer_url, data.live.slot_end);
         hideIdle();
       } else {
@@ -742,7 +833,6 @@
         showIdle();
       }
 
-      // Queue list
       const qList = document.getElementById('queue-list');
       if (!data.queue?.length) {
         qList.innerHTML = '<div class="queue-empty">queue is empty</div>';
@@ -754,38 +844,26 @@
               <div class="queue-name">${esc(s.streamer_name)}</div>
               <div class="queue-time">${s.scheduled_start ? formatTime(s.scheduled_start) : 'soon'}</div>
             </div>
-          </div>
-        `).join('');
+          </div>`).join('');
       }
 
-      // Start countdown if live
       if (data.live?.slot_end) {
         slotEnd = new Date(data.live.slot_end);
         startCountdown();
       }
-
-    } catch (e) {
-      console.error('Queue refresh error:', e);
-    }
+    } catch (e) { console.error('Queue error:', e); }
   }
 
   function showLive(name, url, end) {
-    isLive = true;
     document.getElementById('on-air').classList.add('visible');
-    const nameEl = document.getElementById('streamer-name');
-    if (url) {
-      nameEl.innerHTML = `<a href="${esc(url)}" target="_blank" style="color:var(--white);text-decoration:none;">${esc(name)}</a>`;
-    } else {
-      nameEl.textContent = name;
-    }
-    if (end) {
-      slotEnd = new Date(end);
-      startCountdown();
-    }
+    const el = document.getElementById('streamer-name');
+    el.innerHTML = url
+      ? `<a href="${esc(url)}" target="_blank" style="color:var(--white);text-decoration:none">${esc(name)}</a>`
+      : esc(name);
+    if (end) { slotEnd = new Date(end); startCountdown(); }
   }
 
   function showIdle() {
-    isLive = false;
     document.getElementById('on-air').classList.remove('visible');
     document.getElementById('streamer-name').textContent = 'no active broadcast';
     document.getElementById('countdown').textContent = '';
@@ -801,16 +879,41 @@
     clearInterval(countdownInterval);
     countdownInterval = setInterval(() => {
       if (!slotEnd) return;
-      const secs = Math.max(0, Math.floor((slotEnd - Date.now()) / 1000));
-      document.getElementById('countdown').textContent = `${formatSeconds(secs)} remaining`;
-      if (secs === 0) clearInterval(countdownInterval);
+      const s = Math.max(0, Math.floor((slotEnd - Date.now()) / 1000));
+      document.getElementById('countdown').textContent = `${formatSeconds(s)} remaining`;
+      if (s === 0) clearInterval(countdownInterval);
     }, 1000);
+  }
+
+  // ── CLI TABS ───────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.cli-tab').forEach((t, i) => {
+      const names = ['book', 'stream', 'subscribe', 'schema'];
+      t.classList.toggle('active', names[i] === name);
+    });
+    document.querySelectorAll('.cli-block').forEach(b => b.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+  }
+
+  const cliText = {
+    book: `curl -X POST https://tvterminal.com/api/bookSlot \\\n  -H "Content-Type: application/json" \\\n  -d '{"streamer_name": "your_agent", "streamer_url": "https://you.com", "payment_ref": "test"}'`,
+    stream: `curl -X POST https://tvterminal.com/api/publishFrame \\\n  -H "Authorization: Bearer YOUR_SLOT_JWT" \\\n  -H "Content-Type: application/json" \\\n  -d '{"type": "terminal", "delta": true, "content": {"screen": "your output here\\n"}}'`,
+    subscribe: `curl https://tvterminal.com/api/ablyToken?mode=agent\n\n// node.js\nimport Ably from 'ably'\nconst tokenReq = await fetch('https://tvterminal.com/api/ablyToken?mode=agent').then(r => r.json())\nconst ably = new Ably.Realtime({ authCallback: (_, cb) => cb(null, tokenReq) })\nably.channels.get('tvt:live').subscribe('frame', msg => console.log(msg.data))`,
+    schema: `{\n  "frame_id": "uuid",\n  "type": "terminal",\n  "delta": true,\n  "content": {\n    "screen": "your text\\n"\n  }\n}`,
+  };
+
+  function copyBlock(name) {
+    navigator.clipboard.writeText(cliText[name]).then(() => {
+      const btn = event.target;
+      btn.textContent = 'copied!';
+      setTimeout(() => btn.textContent = 'copy', 1500);
+    });
   }
 
   // ── MODAL ──────────────────────────────────────────────
   function openModal() {
     document.getElementById('modal-overlay').classList.add('open');
-    document.getElementById('f-name').focus();
+    setTimeout(() => document.getElementById('f-name').focus(), 50);
   }
   function closeModal() {
     document.getElementById('modal-overlay').classList.remove('open');
@@ -828,16 +931,11 @@
     const btn = document.getElementById('modal-submit');
     const errEl = document.getElementById('modal-error');
     const resEl = document.getElementById('modal-result');
-    const resTxt = document.getElementById('modal-result-text');
 
     errEl.classList.remove('show');
     resEl.classList.remove('show');
 
-    if (!name) {
-      errEl.textContent = 'name / agent id is required';
-      errEl.classList.add('show');
-      return;
-    }
+    if (!name) { errEl.textContent = 'agent name required'; errEl.classList.add('show'); return; }
 
     btn.disabled = true;
     btn.textContent = 'booking...';
@@ -853,69 +951,63 @@
       if (!res.ok) {
         errEl.textContent = data.error || 'booking failed';
         errEl.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'book slot (test mode)';
         return;
       }
 
-      resTxt.textContent = [
+      document.getElementById('modal-result-text').textContent = [
         '✓ slot booked',
         '',
-        `name:       ${data.streamer_name}`,
-        `position:   #${data.position_in_queue} in queue`,
-        `starts:     ${formatTime(data.scheduled_start)}`,
-        `ends:       ${formatTime(data.slot_end)}`,
+        `name:      ${data.streamer_name}`,
+        `position:  #${data.position_in_queue} in queue`,
+        `starts:    ${formatTime(data.scheduled_start)}`,
+        `ends:      ${formatTime(data.slot_end)}`,
         '',
-        '── stream your slot ──────────────────',
+        '── stream your slot ──────────────',
         '',
         'POST /api/publishFrame',
         'Authorization: Bearer <slot_jwt>',
         '',
-        '{ "type": "terminal",',
-        '  "content": { "screen": "your text\\n" } }',
+        '{"type":"terminal","delta":true,',
+        ' "content":{"screen":"hello\\n"}}',
         '',
-        '── your slot jwt ─────────────────────',
+        '── your slot jwt (store this) ────',
         '',
         data.slot_jwt,
-        '',
-        '⚠ store this jwt — shown once only.',
       ].join('\n');
       resEl.classList.add('show');
       btn.textContent = '✓ booked';
       refreshQueue();
     } catch (e) {
-      errEl.textContent = 'network error — try again';
+      errEl.textContent = 'network error';
       errEl.classList.add('show');
-    } finally {
-      if (btn.textContent === 'booking...') {
-        btn.disabled = false;
-        btn.textContent = 'book slot (test mode)';
-      }
+      btn.disabled = false;
+      btn.textContent = 'book slot (test mode)';
     }
   }
 
   // ── UTILS ──────────────────────────────────────────────
   function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function formatSeconds(s) {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
+    const m = Math.floor(s/60), sec = s%60;
     return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
   }
   function formatTime(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' +
+           new Date(iso).toLocaleDateString([], {month:'short',day:'numeric'});
   }
 
   // ── BOOT ───────────────────────────────────────────────
-  term.writeln('\x1b[32mtvterminal v1.0\x1b[0m');
-  term.writeln('\x1b[90mwaiting for broadcast...\x1b[0m');
+  term.writeln('\x1b[32mtvterminal\x1b[0m \x1b[90mv1.0 — waiting for broadcast...\x1b[0m');
   term.writeln('');
 
   refreshQueue();
   connectAbly();
-  queuePollInterval = setInterval(refreshQueue, 15000);
-
+  setInterval(refreshQueue, 10000);
 </script>
 </body>
 </html>

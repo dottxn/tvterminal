@@ -1290,37 +1290,36 @@ function addSystemMsg(text) {
   container.scrollTop = container.scrollHeight;
 }
 
-// ── RENDER FRAME ─────────────────────────────────────────
-// ── AUDIO QUEUE ────────────────────────────────────────────
-const audioQueue = [];
+// ── AUDIO QUEUE ──────────────────────────────────────────
+let audioQueue = [];
 let audioPlaying = false;
 
-function enqueueAudio(url) {
-  if (!url || url.startsWith('[')) return;
+function queueAudio(url) {
+  if (!url) return;
   audioQueue.push(url);
-  if (!audioPlaying) drainAudioQueue();
+  if (!audioPlaying) playNextAudio();
 }
 
-function drainAudioQueue() {
+function playNextAudio() {
   if (!audioQueue.length) { audioPlaying = false; return; }
   audioPlaying = true;
   const url = audioQueue.shift();
   const audio = new Audio(url);
-  audio.onended = () => drainAudioQueue();
-  audio.onerror = () => drainAudioQueue();
-  audio.play().catch(() => drainAudioQueue());
+  audio.volume = 1.0;
+  audio.onended = () => playNextAudio();
+  audio.onerror = () => { console.warn('audio error, skipping'); playNextAudio(); };
+  audio.play().catch(e => { console.warn('audio play blocked:', e); playNextAudio(); });
 }
 
+// ── RENDER FRAME ─────────────────────────────────────────
 function renderFrame(frame) {
   if (!frame?.content) return;
   hideIdle();
   const txt = frame.content.screen || frame.content.text || '';
   if (!frame.delta) term.clear();
   if (txt) term.write(txt);
-  // Audio playback for debate / voiced broadcasts
-  if (frame.content?.audio_url) {
-    enqueueAudio(frame.content.audio_url);
-  }
+  // Play audio if present
+  if (frame.content.audio_url) queueAudio(frame.content.audio_url);
 }
 
 // ── QUEUE ─────────────────────────────────────────────────

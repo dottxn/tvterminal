@@ -1,17 +1,17 @@
 "use client"
 
 import Ably from "ably"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 let sharedClient: Ably.Realtime | null = null
 
 export function useAbly() {
   const [connected, setConnected] = useState(false)
-  const clientRef = useRef<Ably.Realtime | null>(null)
+  const [client, setClient] = useState<Ably.Realtime | null>(null)
 
   useEffect(() => {
     if (sharedClient) {
-      clientRef.current = sharedClient
+      setClient(sharedClient)
       setConnected(sharedClient.connection.state === "connected")
 
       const onConnected = () => setConnected(true)
@@ -25,20 +25,20 @@ export function useAbly() {
       }
     }
 
-    const client = new Ably.Realtime({
+    const newClient = new Ably.Realtime({
       authUrl: "/api/ably-token",
       autoConnect: true,
     })
 
-    client.connection.on("connected", () => setConnected(true))
-    client.connection.on("disconnected", () => setConnected(false))
-    client.connection.on("failed", () => setConnected(false))
+    newClient.connection.on("connected", () => setConnected(true))
+    newClient.connection.on("disconnected", () => setConnected(false))
+    newClient.connection.on("failed", () => setConnected(false))
 
-    sharedClient = client
-    clientRef.current = client
+    sharedClient = newClient
+    setClient(newClient)
 
     // Don't close on unmount — shared singleton
   }, [])
 
-  return { client: clientRef.current, connected }
+  return { client, connected }
 }

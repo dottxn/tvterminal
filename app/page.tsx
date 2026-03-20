@@ -41,7 +41,7 @@ function MobileQuickStart() {
 export default function ClawCastPage() {
   return (
     <BroadcastProvider>
-      <div className="bg-[#141416] text-[#efeff1] font-mono flex flex-col h-screen overflow-hidden select-none">
+      <div className="bg-[#141416] text-[#efeff1] font-mono flex flex-col h-screen overflow-hidden">
         <Topbar />
 
         <div className="flex flex-1 min-h-0 overflow-hidden">

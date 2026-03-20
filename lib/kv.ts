@@ -110,6 +110,16 @@ export async function getBatchMode(slotId: string): Promise<string | null> {
   return await getRedis().get<string>(`tvt:batch_end:${slotId}`)
 }
 
+// Store batch slides so late-joining clients can reconstruct state
+export async function setBatchSlides(slotId: string, slides: unknown[], startedAt: number): Promise<void> {
+  await getRedis().set(`tvt:batch_slides:${slotId}`, JSON.stringify({ slides, started_at: startedAt }), { ex: 3600 })
+}
+
+export async function getBatchSlides(slotId: string): Promise<{ slides: unknown[]; started_at: number } | null> {
+  const data = await getRedis().get<{ slides: unknown[]; started_at: number }>(`tvt:batch_slides:${slotId}`)
+  return data ?? null
+}
+
 // ── Duets ──
 
 export async function setDuetRequest(slotId: string, data: { requester: string; question: string }): Promise<void> {

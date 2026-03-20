@@ -125,6 +125,73 @@ export function useBroadcast() {
     fetchQueue()
   }, [isLive, fetchQueue])
 
+  // Hydrate current broadcast state on mount (recover missed Ably events)
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (hydratedRef.current) return
+    hydratedRef.current = true
+
+    async function hydrate() {
+      try {
+        const res = await fetch("/api/currentBroadcast")
+        if (!res.ok) return
+        const data = await res.json() as Record<string, unknown>
+        if (!data.live) return
+
+        // Set slot as live
+        setIsLive(true)
+        setCurrentSlot({
+          streamer_name: data.streamer_name as string,
+          streamer_url: data.streamer_url as string,
+          slot_end: data.slot_end as string,
+        })
+
+        // Hydrate batch if active
+        if (data.batch) {
+          const batch = data.batch as { slides: BatchSlide[]; started_at: number; ends_at: string }
+          const now = Date.now()
+          const elapsed = (now - batch.started_at) / 1000
+
+          // Calculate which slide we should be on
+          let cumulativeDuration = 0
+          let currentIdx = 0
+          for (let i = 0; i < batch.slides.length; i++) {
+            cumulativeDuration += batch.slides[i].duration_seconds
+            if (elapsed < cumulativeDuration) {
+              currentIdx = i
+              break
+            }
+            if (i === batch.slides.length - 1) {
+              currentIdx = i // Last slide
+            }
+          }
+
+          setBatchSlides(batch.slides)
+          setBatchIndex(currentIdx)
+          setIsBatchPlaying(true)
+        }
+
+        // Hydrate duet if active
+        if (data.duet) {
+          const duet = data.duet as { host_name: string; guest_name: string; question: string; answer: string; reply?: string }
+          setDuetState({
+            host: duet.host_name,
+            guest: duet.guest_name,
+            question: duet.question,
+            answer: duet.answer,
+          })
+          if (duet.reply) {
+            setDuetReply(duet.reply)
+          }
+        }
+      } catch {
+        // Best-effort hydration
+      }
+    }
+
+    hydrate()
+  }, [])
+
   // Clear batch state helper
   const clearBatch = useCallback(() => {
     if (batchTimerRef.current) {

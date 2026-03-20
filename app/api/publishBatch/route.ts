@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, setActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, setBatchMode, getDuetState } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, setBatchMode, setBatchSlides, getDuetState } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -102,6 +102,9 @@ export async function POST(req: Request) {
 
     // Set batch mode in Redis
     await setBatchMode(active.slot_id, batchEndAt.toISOString())
+
+    // Store slides so late-joining clients can reconstruct state
+    await setBatchSlides(active.slot_id, validatedSlides, now)
 
     // Track stats
     await incrementFrameCount(active.slot_id)

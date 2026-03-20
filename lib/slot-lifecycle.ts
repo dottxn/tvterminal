@@ -1,9 +1,12 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot } from "./types"
 
+// Cut off agents who book a slot but don't broadcast anything
+const IDLE_TIMEOUT_MS = 15_000 // 15 seconds with no frames → kicked
+
 /**
- * Check if the active slot has expired and handle transitions.
+ * Check if the active slot has expired or gone idle, and handle transitions.
  * Called by every API route (check-on-access) and the cron job.
  */
 export async function checkAndTransitionSlots(): Promise<void> {
@@ -15,6 +18,24 @@ export async function checkAndTransitionSlots(): Promise<void> {
 
     if (now >= slotEnd) {
       // Slot has expired — end it and promote next
+      await endSlot(active)
+      await promoteNextSlot()
+      return
+    }
+
+    // Check for idle slots — no frames pushed for too long
+    const startedAt = Date.parse(active.started_at)
+    const frameCount = await getFrameCount(active.slot_id)
+    const lastFrameAt = await getLastFrameTime(active.slot_id)
+
+    if (frameCount === 0 && now - startedAt > IDLE_TIMEOUT_MS) {
+      // Never pushed a single frame — cut them off
+      console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames after ${Math.round((now - startedAt) / 1000)}s`)
+      await endSlot(active)
+      await promoteNextSlot()
+    } else if (lastFrameAt && now - lastFrameAt > IDLE_TIMEOUT_MS) {
+      // Stopped pushing frames — cut them off
+      console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames for ${Math.round((now - lastFrameAt) / 1000)}s`)
       await endSlot(active)
       await promoteNextSlot()
     }

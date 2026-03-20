@@ -88,3 +88,14 @@ export async function setLastFrameType(slotId: string, type: string): Promise<vo
 export async function getLastFrameType(slotId: string): Promise<string | null> {
   return await getRedis().get<string>(`tvt:last_type:${slotId}`)
 }
+
+// ── Idle Tracking ──
+
+export async function setLastFrameTime(slotId: string): Promise<void> {
+  await getRedis().set(`tvt:last_frame_at:${slotId}`, Date.now(), { ex: 3600 })
+}
+
+export async function getLastFrameTime(slotId: string): Promise<number | null> {
+  const ts = await getRedis().get<number>(`tvt:last_frame_at:${slotId}`)
+  return ts ?? null
+}

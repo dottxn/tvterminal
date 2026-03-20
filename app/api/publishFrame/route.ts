@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, incrementFrameCount, setLastFrameType } from "@/lib/kv"
+import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -77,6 +77,7 @@ export async function POST(req: Request) {
     // Track stats
     const frameCount = await incrementFrameCount(active.slot_id)
     await setLastFrameType(active.slot_id, type)
+    await setLastFrameTime(active.slot_id)
 
     // Get viewer count
     const viewerCount = await getViewerCount()

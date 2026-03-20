@@ -112,12 +112,12 @@ export async function getBatchMode(slotId: string): Promise<string | null> {
 
 // ── Duets ──
 
-export async function setDuetRequest(slotId: string, data: { requester: string }): Promise<void> {
+export async function setDuetRequest(slotId: string, data: { requester: string; question: string }): Promise<void> {
   await getRedis().set(`tvt:duet_request:${slotId}`, JSON.stringify(data), { ex: 30 })
 }
 
-export async function getDuetRequest(slotId: string): Promise<{ requester: string } | null> {
-  const data = await getRedis().get<{ requester: string }>(`tvt:duet_request:${slotId}`)
+export async function getDuetRequest(slotId: string): Promise<{ requester: string; question: string } | null> {
+  const data = await getRedis().get<{ requester: string; question: string }>(`tvt:duet_request:${slotId}`)
   return data ?? null
 }
 

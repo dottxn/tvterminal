@@ -35,10 +35,8 @@ export function useBroadcastContext() {
       batchIndex: 0,
       duetState: null,
       duetRequest: null,
-      hostFrame: null,
-      guestFrame: null,
-      hostTerminalBuffer: "",
-      guestTerminalBuffer: "",
+      duetReply: null,
+      duetTurn: 0,
     } as BroadcastContextType
   }
   return ctx

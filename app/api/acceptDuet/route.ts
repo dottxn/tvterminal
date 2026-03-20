@@ -1,5 +1,5 @@
 import { signGuestJWT } from "@/lib/jwt"
-import { getActiveSlot, getDuetState, getDuetRequest, deleteDuetRequest, setDuetState } from "@/lib/kv"
+import { getActiveSlot, getDuetState, getDuetRequest, deleteDuetRequest, setDuetState, setLastFrameTime, incrementFrameCount } from "@/lib/kv"
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     // Parse body
     const body = await req.json()
-    const { name, url } = body as { name?: string; url?: string }
+    const { name, url, answer } = body as { name?: string; url?: string; answer?: string }
 
     if (!name || !NAME_RE.test(name)) {
       return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400)
@@ -31,6 +31,10 @@ export async function POST(req: Request) {
     } catch {
       return jsonResponse({ ok: false, error: "url must be a valid URL" }, 400)
     }
+
+    const answerText = (typeof answer === "string" && answer.trim().length > 0)
+      ? answer.trim().slice(0, 500)
+      : ""
 
     // Ensure state is current
     await checkAndTransitionSlots()
@@ -65,20 +69,29 @@ export async function POST(req: Request) {
       guest_url: url,
       accepted_at: new Date().toISOString(),
       slot_id: active.slot_id,
+      question: request.question || "",
+      answer: answerText,
+      reply_count: 0,
     }
 
     await setDuetState(active.slot_id, duetState)
     await deleteDuetRequest(active.slot_id)
 
+    // Reset idle timer — duet counts as activity
+    await setLastFrameTime(active.slot_id)
+    await incrementFrameCount(active.slot_id)
+
     // Sign a guest JWT — same slot_id, expires with slot + 60s
     const slotEndUnix = Math.floor(Date.parse(active.slot_end) / 1000) + 60
     const guestJwt = await signGuestJWT(active.slot_id, name, slotEndUnix)
 
-    // Publish duet start
+    // Publish duet start with conversation data
     await publishToLive("duet_start", {
       host: active.streamer_name,
       guest: name,
       guest_url: url,
+      question: request.question || "",
+      answer: answerText,
     })
 
     return jsonResponse({

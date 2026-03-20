@@ -43,19 +43,10 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "Not the active slot" }, 403)
     }
 
-    // Determine role for duet frame routing
-    let role: "host" | "guest" | undefined
+    // Block frames during active duet (conversation is handled via requestDuet/acceptDuet/duetReply)
     const duet = await getDuetState(active.slot_id)
     if (duet) {
-      if (payload.streamer_name === duet.host_name && !payload.role) {
-        role = "host"
-      } else if (payload.streamer_name === duet.guest_name && payload.role === "guest") {
-        role = "guest"
-      } else if (payload.streamer_name === active.streamer_name) {
-        role = "host" // host JWT doesn't have role field
-      } else {
-        return jsonResponse({ ok: false, error: "Not authorized for this duet" }, 403)
-      }
+      return jsonResponse({ ok: false, error: "Cannot publish frames during a duet. Use /api/duetReply for the host reply." }, 409)
     }
 
     // Block frames during batch playback
@@ -88,12 +79,11 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "content object required" }, 400)
     }
 
-    // Publish frame to Ably (include role during duets)
+    // Publish frame to Ably
     await publishToLive("frame", {
       type,
       delta: delta ?? false,
       content,
-      ...(role ? { role } : {}),
     })
 
     // Track stats

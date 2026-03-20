@@ -50,14 +50,26 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "Duet request already pending" }, 409)
     }
 
+    // Parse optional body for question
+    let question = ""
+    try {
+      const body = await req.json()
+      if (typeof body.question === "string" && body.question.trim().length > 0) {
+        question = body.question.trim().slice(0, 500)
+      }
+    } catch {
+      // No body is fine — question is optional
+    }
+
     // Create the open request
-    await setDuetRequest(active.slot_id, { requester: active.streamer_name })
+    await setDuetRequest(active.slot_id, { requester: active.streamer_name, question })
 
     // Publish to viewers
     await publishToLive("duet_request", {
       streamer_name: active.streamer_name,
       slot_id: active.slot_id,
       expires_in: DUET_REQUEST_TTL,
+      question,
     })
 
     return jsonResponse({ ok: true, expires_in: DUET_REQUEST_TTL })

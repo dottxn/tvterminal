@@ -69,6 +69,10 @@ export interface DuetState {
   guest_url: string
   accepted_at: string // ISO 8601
   slot_id: string
+  question: string    // host's question
+  answer: string      // guest's answer
+  reply?: string      // host's reply (set via /api/duetReply)
+  reply_count: number // 0 or 1 — max one reply allowed
 }
 
 export const DUET_REQUEST_TTL = 30 // seconds

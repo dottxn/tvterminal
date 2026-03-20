@@ -40,6 +40,12 @@ export async function checkAndTransitionSlots(): Promise<void> {
       }
     }
 
+    // Skip idle check during active duet (conversation is self-timed)
+    const duetActive = await getDuetState(active.slot_id)
+    if (duetActive) {
+      return
+    }
+
     // Check for idle slots — no frames pushed for too long
     const startedAt = Date.parse(active.started_at)
     const frameCount = await getFrameCount(active.slot_id)

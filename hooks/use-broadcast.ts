@@ -20,6 +20,8 @@ export interface BroadcastFrame {
     bg_color?: string
     text_color?: string
     accent_color?: string
+    // GIF background
+    gif_url?: string
   }
 }
 
@@ -66,18 +68,6 @@ function nameToColor(name: string): string {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// Helper to clear all duet-related state
-function clearDuetDefaults() {
-  return {
-    duetState: null as { host: string; guest: string } | null,
-    duetRequest: null as { streamer_name: string; expires_at: number } | null,
-    hostFrame: null as BroadcastFrame | null,
-    guestFrame: null as BroadcastFrame | null,
-    hostTerminalBuffer: "",
-    guestTerminalBuffer: "",
-  }
-}
-
 export function useBroadcast() {
   const { client, connected } = useAbly()
   const [isLive, setIsLive] = useState(false)
@@ -95,13 +85,21 @@ export function useBroadcast() {
   const [isBatchPlaying, setIsBatchPlaying] = useState(false)
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Duet state
-  const [duetState, setDuetState] = useState<{ host: string; guest: string } | null>(null)
-  const [duetRequest, setDuetRequest] = useState<{ streamer_name: string; expires_at: number } | null>(null)
-  const [hostFrame, setHostFrame] = useState<BroadcastFrame | null>(null)
-  const [guestFrame, setGuestFrame] = useState<BroadcastFrame | null>(null)
-  const [hostTerminalBuffer, setHostTerminalBuffer] = useState("")
-  const [guestTerminalBuffer, setGuestTerminalBuffer] = useState("")
+  // Duet state — structured 3-turn conversation
+  const [duetState, setDuetState] = useState<{
+    host: string
+    guest: string
+    question: string
+    answer: string
+  } | null>(null)
+  const [duetReply, setDuetReply] = useState<string | null>(null)
+  const [duetTurn, setDuetTurn] = useState(0) // 0=none, 1=question, 2=answer, 3=reply
+  const [duetRequest, setDuetRequest] = useState<{
+    streamer_name: string
+    question: string
+    expires_at: number
+  } | null>(null)
+  const duetTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   // Poll /api/getQueue for real queue state
   const fetchQueue = useCallback(async () => {
@@ -140,12 +138,12 @@ export function useBroadcast() {
 
   // Clear duet state helper
   const clearDuet = useCallback(() => {
+    duetTimersRef.current.forEach(clearTimeout)
+    duetTimersRef.current = []
     setDuetState(null)
     setDuetRequest(null)
-    setHostFrame(null)
-    setGuestFrame(null)
-    setHostTerminalBuffer("")
-    setGuestTerminalBuffer("")
+    setDuetReply(null)
+    setDuetTurn(0)
   }, [])
 
   // Auto-dismiss duet request after expiry
@@ -159,6 +157,40 @@ export function useBroadcast() {
     const timer = setTimeout(() => setDuetRequest(null), remaining)
     return () => clearTimeout(timer)
   }, [duetRequest])
+
+  // Duet auto-advance: Turn 1 (8s) → Turn 2 (8s) → wait for reply → Turn 3 (8s)
+  useEffect(() => {
+    if (!duetState) return
+
+    // Clear any old timers
+    duetTimersRef.current.forEach(clearTimeout)
+    duetTimersRef.current = []
+
+    // Start at Turn 1
+    setDuetTurn(1)
+
+    // Advance to Turn 2 after 8s
+    const t1 = setTimeout(() => setDuetTurn(2), 8000)
+    duetTimersRef.current.push(t1)
+
+    return () => {
+      duetTimersRef.current.forEach(clearTimeout)
+      duetTimersRef.current = []
+    }
+  }, [duetState])
+
+  // When reply arrives, show Turn 3 (but only after Turn 2 has had time)
+  useEffect(() => {
+    if (!duetReply || !duetState) return
+
+    if (duetTurn >= 2) {
+      // Already showing answer, advance to reply after a brief pause
+      const t = setTimeout(() => setDuetTurn(3), 1500)
+      duetTimersRef.current.push(t)
+      return () => clearTimeout(t)
+    }
+    // If reply arrives early, it'll naturally show when turn catches up
+  }, [duetReply, duetState, duetTurn])
 
   // Batch auto-advance
   useEffect(() => {
@@ -199,37 +231,15 @@ export function useBroadcast() {
     const liveChannel = client.channels.get("tvt:live")
     const chatChannel = client.channels.get("tvt:chat")
 
-    // Frame handler — routes to duet halves if role is present
+    // Frame handler (regular frames only — duets are conversation-based now)
     liveChannel.subscribe("frame", (msg) => {
-      const frame = msg.data as BroadcastFrame & { role?: "host" | "guest" }
-
-      if (frame.role === "host") {
-        setHostFrame(frame)
-        if (frame.type === "terminal" && frame.content.screen) {
-          if (frame.delta) {
-            setHostTerminalBuffer((prev) => prev + frame.content.screen)
-          } else {
-            setHostTerminalBuffer(frame.content.screen ?? "")
-          }
-        }
-      } else if (frame.role === "guest") {
-        setGuestFrame(frame)
-        if (frame.type === "terminal" && frame.content.screen) {
-          if (frame.delta) {
-            setGuestTerminalBuffer((prev) => prev + frame.content.screen)
-          } else {
-            setGuestTerminalBuffer(frame.content.screen ?? "")
-          }
-        }
-      } else {
-        // Regular (non-duet) frame
-        setLatestFrame(frame)
-        if (frame.type === "terminal" && frame.content.screen) {
-          if (frame.delta) {
-            setTerminalBuffer((prev) => prev + frame.content.screen)
-          } else {
-            setTerminalBuffer(frame.content.screen ?? "")
-          }
+      const frame = msg.data as BroadcastFrame
+      setLatestFrame(frame)
+      if (frame.type === "terminal" && frame.content.screen) {
+        if (frame.delta) {
+          setTerminalBuffer((prev) => prev + frame.content.screen)
+        } else {
+          setTerminalBuffer(frame.content.screen ?? "")
         }
       }
     })
@@ -245,32 +255,41 @@ export function useBroadcast() {
       }
     })
 
-    // Duet request (open invitation)
+    // Duet request (open invitation with question)
     liveChannel.subscribe("duet_request", (msg) => {
-      const data = msg.data as { streamer_name: string; expires_in: number }
+      const data = msg.data as { streamer_name: string; expires_in: number; question?: string }
       setDuetRequest({
         streamer_name: data.streamer_name,
+        question: data.question || "",
         expires_at: Date.now() + data.expires_in * 1000,
       })
     })
 
-    // Duet accepted — split screen begins
+    // Duet accepted — structured conversation begins
     liveChannel.subscribe("duet_start", (msg) => {
-      const data = msg.data as { host: string; guest: string }
-      setDuetState({ host: data.host, guest: data.guest })
+      const data = msg.data as { host: string; guest: string; question: string; answer: string }
+      setDuetState({
+        host: data.host,
+        guest: data.guest,
+        question: data.question || "",
+        answer: data.answer || "",
+      })
       setDuetRequest(null)
-      setGuestFrame(null)
-      setGuestTerminalBuffer("")
+      setDuetReply(null)
+    })
+
+    // Host's reply arrives
+    liveChannel.subscribe("duet_reply", (msg) => {
+      const data = msg.data as { host: string; reply: string }
+      setDuetReply(data.reply)
     })
 
     // Duet ends
     liveChannel.subscribe("duet_end", () => {
       setDuetState(null)
       setDuetRequest(null)
-      setHostFrame(null)
-      setGuestFrame(null)
-      setHostTerminalBuffer("")
-      setGuestTerminalBuffer("")
+      setDuetReply(null)
+      setDuetTurn(0)
     })
 
     // Slot start
@@ -371,9 +390,7 @@ export function useBroadcast() {
     // Duet state
     duetState,
     duetRequest,
-    hostFrame,
-    guestFrame,
-    hostTerminalBuffer,
-    guestTerminalBuffer,
+    duetReply,
+    duetTurn,
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAbly } from "@/lib/ably-client"
 
 export interface BroadcastFrame {
@@ -32,6 +32,19 @@ export interface ChatMessage {
   timestamp: number
 }
 
+export interface QueueEntry {
+  position: number
+  streamer_name: string
+  scheduled_start: string
+  duration_minutes: number
+}
+
+export interface LiveInfo {
+  streamer_name: string
+  seconds_remaining: number
+  slot_end: string
+}
+
 // Generate a consistent color from a string
 function nameToColor(name: string): string {
   const colors = ["#E63946", "#00c853", "#ff7b00", "#00b8d9", "#9b59b6", "#e67e22", "#1abc9c"]
@@ -50,6 +63,32 @@ export function useBroadcast() {
   const [terminalBuffer, setTerminalBuffer] = useState("")
   const [viewerCount, setViewerCount] = useState(0)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [queue, setQueue] = useState<QueueEntry[]>([])
+  const [liveInfo, setLiveInfo] = useState<LiveInfo | null>(null)
+
+  // Poll /api/getQueue for real queue state
+  const fetchQueue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/getQueue")
+      if (!res.ok) return
+      const data = await res.json() as { live: LiveInfo | null; queue: QueueEntry[] }
+      setLiveInfo(data.live)
+      setQueue(data.queue)
+    } catch {
+      // Silently fail — queue polling is best-effort
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchQueue()
+    const interval = setInterval(fetchQueue, 10000) // Poll every 10s
+    return () => clearInterval(interval)
+  }, [fetchQueue])
+
+  // Re-fetch queue immediately on slot transitions
+  useEffect(() => {
+    fetchQueue()
+  }, [isLive, fetchQueue])
 
   useEffect(() => {
     if (!client) return
@@ -153,5 +192,7 @@ export function useBroadcast() {
     terminalBuffer,
     viewerCount,
     chatMessages,
+    queue,
+    liveInfo,
   }
 }

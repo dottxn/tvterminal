@@ -1,7 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { QUEUE, TYPE_COLORS } from "@/lib/queue-data"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import type { BroadcastFrame } from "@/hooks/use-broadcast"
 
@@ -70,30 +68,15 @@ function IdleView() {
 }
 
 export default function Broadcast() {
-  const { connected, isLive, currentSlot, latestFrame, terminalBuffer, viewerCount } = useBroadcastContext()
-
-  // Mock rotation fallback when not live
-  const [queueIdx, setQueueIdx] = useState(0)
-  const [visible, setVisible] = useState(true)
-
-  useEffect(() => {
-    if (isLive) return // Don't cycle when we have a real broadcast
-    const interval = setInterval(() => {
-      setVisible(false)
-      setTimeout(() => {
-        setQueueIdx(i => (i + 1) % QUEUE.length)
-        setVisible(true)
-      }, 300)
-    }, 6000)
-    return () => clearInterval(interval)
-  }, [isLive])
+  const { isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo } = useBroadcastContext()
 
   // Decide what to show in the info bar
   const showLive = isLive && currentSlot
-  const displayName = showLive ? currentSlot.streamer_name : QUEUE[queueIdx].name
-  const displayType = showLive ? (currentSlot.type ?? "Ask") : QUEUE[queueIdx].type
-  const typeColor = TYPE_COLORS[displayType] ?? "#E63946"
-  const displayViewers = connected ? viewerCount : 23
+  const displayName = showLive
+    ? currentSlot.streamer_name
+    : liveInfo
+      ? liveInfo.streamer_name
+      : null
 
   return (
     <section className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -103,33 +86,26 @@ export default function Broadcast() {
 
         {/* live dot */}
         <span className={`inline-block w-[10px] h-[10px] rounded-full shrink-0 ${
-          isLive ? "live-pulse bg-[#e91916]" : connected ? "bg-[#3a3a48]" : "live-pulse bg-[#e91916]"
+          isLive || liveInfo ? "live-pulse bg-[#e91916]" : "bg-[#3a3a48]"
         }`} />
 
         {/* label + chips */}
-        <div
-          className="flex items-center gap-3 text-[13px] text-[#6b6b7a] font-sans transition-opacity duration-300"
-          style={{ opacity: showLive ? 1 : visible ? 1 : 0 }}
-        >
-          <span>{isLive ? "Live now" : "Current broadcast"}</span>
-
-          {/* type chip */}
-          <span
-            className="px-3 py-1 text-[12px] font-semibold font-sans tracking-wide"
-            style={{
-              color: typeColor,
-              background: typeColor + "22",
-            }}
-          >
-            {displayType}
-          </span>
-
-          <span>by</span>
-
-          {/* username chip */}
-          <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
-            {displayName}
-          </span>
+        <div className="flex items-center gap-3 text-[13px] text-[#6b6b7a] font-sans">
+          {displayName ? (
+            <>
+              <span>Live now</span>
+              <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
+                {displayName}
+              </span>
+              {liveInfo && (
+                <span className="text-[11px] font-mono text-[#6b6b7a] tabular-nums">
+                  {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")} left
+                </span>
+              )}
+            </>
+          ) : (
+            <span>No broadcast</span>
+          )}
         </div>
 
         {/* viewers */}
@@ -141,7 +117,7 @@ export default function Broadcast() {
             <path d="M12 2v4M10 8V6M14 8V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             <path d="M8 20v1M16 20v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          <span className="text-[13px] text-[#adadb8] font-mono tabular-nums">{displayViewers}</span>
+          <span className="text-[13px] text-[#adadb8] font-mono tabular-nums">{viewerCount}</span>
         </div>
       </div>
 

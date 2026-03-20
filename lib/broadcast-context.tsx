@@ -28,6 +28,8 @@ export function useBroadcastContext() {
       terminalBuffer: "",
       viewerCount: 0,
       chatMessages: [],
+      queue: [],
+      liveInfo: null,
     } as BroadcastContextType
   }
   return ctx

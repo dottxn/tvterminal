@@ -2,13 +2,82 @@
 
 import { useEffect, useState } from "react"
 import { QUEUE, TYPE_COLORS } from "@/lib/queue-data"
+import { useBroadcastContext } from "@/lib/broadcast-context"
+import type { BroadcastFrame } from "@/hooks/use-broadcast"
+
+// Strip ANSI escape codes for clean rendering
+function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*m/g, "")
+}
+
+function TerminalView({ content, buffer }: { content: BroadcastFrame["content"]; buffer: string }) {
+  const text = buffer || content.screen || content.text || ""
+  return (
+    <pre className="absolute inset-0 p-5 overflow-auto text-[13px] font-mono text-[#e8e8e8] bg-[#0e0e10] whitespace-pre-wrap leading-relaxed">
+      {stripAnsi(text)}
+    </pre>
+  )
+}
+
+function TextView({ content }: { content: BroadcastFrame["content"] }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      {content.headline && (
+        <h2 className="text-[clamp(24px,4vw,44px)] font-sans font-bold text-[#efeff1] leading-tight mb-4">
+          {content.headline}
+        </h2>
+      )}
+      {(content.body || content.text) && (
+        <p className="text-[16px] font-mono text-[#adadb8] leading-relaxed max-w-[600px]">
+          {content.body || content.text}
+        </p>
+      )}
+      {content.meta && (
+        <span className="mt-4 text-[11px] font-mono text-[#6b6b7a]">
+          {content.meta}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function DataView({ content }: { content: BroadcastFrame["content"] }) {
+  return (
+    <div className="flex flex-col gap-2 p-6 w-full max-w-[500px] mx-auto my-auto">
+      {content.rows?.map((row, i) => (
+        <div key={i} className="flex justify-between items-baseline py-2 border-b border-[#2a2a35]">
+          <span className="text-[12px] font-sans text-[#6b6b7a]">{row.label}</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[14px] font-mono text-[#efeff1] tabular-nums">{row.value}</span>
+            {row.change && (
+              <span className={`text-[10px] font-mono ${row.change.startsWith("+") ? "text-[#00c853]" : "text-[#e91916]"}`}>
+                {row.change}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function IdleView() {
+  return (
+    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#3a3a48]">
+      waiting for broadcast
+    </span>
+  )
+}
 
 export default function Broadcast() {
+  const { connected, isLive, currentSlot, latestFrame, terminalBuffer, viewerCount } = useBroadcastContext()
+
+  // Mock rotation fallback when not live
   const [queueIdx, setQueueIdx] = useState(0)
   const [visible, setVisible] = useState(true)
 
-  // rotate through queue every 6s with a fade transition
   useEffect(() => {
+    if (isLive) return // Don't cycle when we have a real broadcast
     const interval = setInterval(() => {
       setVisible(false)
       setTimeout(() => {
@@ -17,10 +86,14 @@ export default function Broadcast() {
       }, 300)
     }, 6000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isLive])
 
-  const current = QUEUE[queueIdx]
-  const typeColor = TYPE_COLORS[current.type] ?? "#E63946"
+  // Decide what to show in the info bar
+  const showLive = isLive && currentSlot
+  const displayName = showLive ? currentSlot.streamer_name : QUEUE[queueIdx].name
+  const displayType = showLive ? (currentSlot.type ?? "Ask") : QUEUE[queueIdx].type
+  const typeColor = TYPE_COLORS[displayType] ?? "#E63946"
+  const displayViewers = connected ? viewerCount : 23
 
   return (
     <section className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -29,14 +102,16 @@ export default function Broadcast() {
       <div className="flex items-center gap-4 px-5 h-16 bg-[#18181b] shrink-0">
 
         {/* live dot */}
-        <span className="live-pulse inline-block w-[10px] h-[10px] rounded-full bg-[#e91916] shrink-0" />
+        <span className={`inline-block w-[10px] h-[10px] rounded-full shrink-0 ${
+          isLive ? "live-pulse bg-[#e91916]" : connected ? "bg-[#3a3a48]" : "live-pulse bg-[#e91916]"
+        }`} />
 
         {/* label + chips */}
         <div
           className="flex items-center gap-3 text-[13px] text-[#6b6b7a] font-sans transition-opacity duration-300"
-          style={{ opacity: visible ? 1 : 0 }}
+          style={{ opacity: showLive ? 1 : visible ? 1 : 0 }}
         >
-          <span>Current broadcast</span>
+          <span>{isLive ? "Live now" : "Current broadcast"}</span>
 
           {/* type chip */}
           <span
@@ -46,14 +121,14 @@ export default function Broadcast() {
               background: typeColor + "22",
             }}
           >
-            {current.type}
+            {displayType}
           </span>
 
           <span>by</span>
 
           {/* username chip */}
           <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
-            {current.name}
+            {displayName}
           </span>
         </div>
 
@@ -66,15 +141,25 @@ export default function Broadcast() {
             <path d="M12 2v4M10 8V6M14 8V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             <path d="M8 20v1M16 20v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          <span className="text-[13px] text-[#adadb8] font-mono tabular-nums">23</span>
+          <span className="text-[13px] text-[#adadb8] font-mono tabular-nums">{displayViewers}</span>
         </div>
       </div>
 
       {/* ── Viewport — 16:9 ── */}
       <div className="relative w-full aspect-video bg-[#0e0e10] flex items-center justify-center overflow-hidden">
-        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#3a3a48]">
-          waiting for broadcast
-        </span>
+        {latestFrame ? (
+          latestFrame.type === "terminal" ? (
+            <TerminalView content={latestFrame.content} buffer={terminalBuffer} />
+          ) : latestFrame.type === "text" ? (
+            <TextView content={latestFrame.content} />
+          ) : latestFrame.type === "data" ? (
+            <DataView content={latestFrame.content} />
+          ) : (
+            <IdleView />
+          )
+        ) : (
+          <IdleView />
+        )}
       </div>
     </section>
   )

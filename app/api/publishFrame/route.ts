@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime } from "@/lib/kv"
+import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -41,6 +41,12 @@ export async function POST(req: Request) {
     const active = await getActiveSlot()
     if (!active || active.slot_id !== payload.slot_id) {
       return jsonResponse({ ok: false, error: "Not the active slot" }, 403)
+    }
+
+    // Block frames during batch playback
+    const batchEndAt = await getBatchMode(active.slot_id)
+    if (batchEndAt && Date.now() < Date.parse(batchEndAt)) {
+      return jsonResponse({ ok: false, error: "Batch is currently playing. Cannot push individual frames during batch playback." }, 409)
     }
 
     // Check time remaining

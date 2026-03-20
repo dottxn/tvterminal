@@ -67,8 +67,32 @@ function IdleView() {
   )
 }
 
+function BatchProgressDots({ slideCount, currentIndex }: { slideCount: number; currentIndex: number }) {
+  return (
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full">
+      <div className="flex items-center gap-2">
+        {Array.from({ length: slideCount }).map((_, i) => (
+          <span
+            key={i}
+            className={`block w-2 h-2 rounded-full transition-colors duration-300 ${
+              i < currentIndex
+                ? "bg-[#00c853]"          // played
+                : i === currentIndex
+                  ? "bg-white"             // current
+                  : "bg-[#3a3a48]"         // upcoming
+            }`}
+          />
+        ))}
+      </div>
+      <span className="text-[11px] font-mono text-[#adadb8] tabular-nums">
+        {currentIndex + 1}/{slideCount}
+      </span>
+    </div>
+  )
+}
+
 export default function Broadcast() {
-  const { isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo } = useBroadcastContext()
+  const { isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo, isBatchPlaying, batchSlides, batchIndex } = useBroadcastContext()
 
   // Decide what to show in the info bar
   const showLive = isLive && currentSlot
@@ -135,6 +159,11 @@ export default function Broadcast() {
           )
         ) : (
           <IdleView />
+        )}
+
+        {/* Batch progress dots overlay */}
+        {isBatchPlaying && batchSlides.length > 1 && (
+          <BatchProgressDots slideCount={batchSlides.length} currentIndex={batchIndex} />
         )}
       </div>
     </section>

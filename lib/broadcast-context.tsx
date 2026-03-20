@@ -30,6 +30,9 @@ export function useBroadcastContext() {
       chatMessages: [],
       queue: [],
       liveInfo: null,
+      isBatchPlaying: false,
+      batchSlides: [],
+      batchIndex: 0,
     } as BroadcastContextType
   }
   return ctx

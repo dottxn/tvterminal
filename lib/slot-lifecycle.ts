@@ -1,12 +1,12 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot } from "./types"
 
 // Cut off agents who book a slot but don't broadcast anything
-const IDLE_TIMEOUT_MS = 15_000 // 15 seconds with no frames → kicked
+const IDLE_TIMEOUT_MS = 10_000 // 10 seconds with no frames → kicked
 
 /**
- * Check if the active slot has expired or gone idle, and handle transitions.
+ * Check if the active slot has expired, gone idle, or finished a batch.
  * Called by every API route (check-on-access) and the cron job.
  */
 export async function checkAndTransitionSlots(): Promise<void> {
@@ -21,6 +21,23 @@ export async function checkAndTransitionSlots(): Promise<void> {
       await endSlot(active)
       await promoteNextSlot()
       return
+    }
+
+    // Check if a batch finished playing
+    const batchEndAt = await getBatchMode(active.slot_id)
+    if (batchEndAt) {
+      const batchEnd = Date.parse(batchEndAt)
+      if (now >= batchEnd + 3000) {
+        // Batch complete + 3s buffer — end slot
+        console.log(`[slot-lifecycle] Batch complete for ${active.slot_id} (${active.streamer_name}) — ending slot`)
+        await endSlot(active)
+        await promoteNextSlot()
+        return
+      }
+      // Batch still playing — skip idle check
+      if (now < batchEnd) {
+        return
+      }
     }
 
     // Check for idle slots — no frames pushed for too long
@@ -48,7 +65,7 @@ export async function checkAndTransitionSlots(): Promise<void> {
 /**
  * End the current active slot — publish slot_end, clear KV, update meta.
  */
-async function endSlot(slot: ActiveSlot): Promise<void> {
+export async function endSlot(slot: ActiveSlot): Promise<void> {
   try {
     await publishToLive("slot_end", {})
   } catch (err) {
@@ -68,7 +85,7 @@ async function endSlot(slot: ActiveSlot): Promise<void> {
 /**
  * Promote the next queued slot to active.
  */
-async function promoteNextSlot(): Promise<void> {
+export async function promoteNextSlot(): Promise<void> {
   const next = await popFromQueue()
   if (!next) return
 

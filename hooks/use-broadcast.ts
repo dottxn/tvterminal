@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useAbly } from "@/lib/ably-client"
 
 export interface BroadcastFrame {
@@ -16,6 +16,12 @@ export interface BroadcastFrame {
     widget_url?: string
     widget_type?: string
   }
+}
+
+export interface BatchSlide {
+  type: "terminal" | "text" | "data" | "widget"
+  content: Record<string, unknown>
+  duration_seconds: number
 }
 
 export interface SlotInfo {
@@ -66,6 +72,12 @@ export function useBroadcast() {
   const [queue, setQueue] = useState<QueueEntry[]>([])
   const [liveInfo, setLiveInfo] = useState<LiveInfo | null>(null)
 
+  // Batch playback state
+  const [batchSlides, setBatchSlides] = useState<BatchSlide[]>([])
+  const [batchIndex, setBatchIndex] = useState(0)
+  const [isBatchPlaying, setIsBatchPlaying] = useState(false)
+  const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Poll /api/getQueue for real queue state
   const fetchQueue = useCallback(async () => {
     try {
@@ -90,6 +102,53 @@ export function useBroadcast() {
     fetchQueue()
   }, [isLive, fetchQueue])
 
+  // Clear batch state helper
+  const clearBatch = useCallback(() => {
+    if (batchTimerRef.current) {
+      clearTimeout(batchTimerRef.current)
+      batchTimerRef.current = null
+    }
+    setBatchSlides([])
+    setBatchIndex(0)
+    setIsBatchPlaying(false)
+  }, [])
+
+  // Batch auto-advance: when batchSlides or batchIndex changes, schedule next
+  useEffect(() => {
+    if (!isBatchPlaying || batchSlides.length === 0) return
+
+    const currentSlide = batchSlides[batchIndex]
+    if (!currentSlide) {
+      // Past the last slide — batch done
+      clearBatch()
+      fetchQueue() // Pick up the slot end
+      return
+    }
+
+    // Set this slide as the current frame
+    setLatestFrame({
+      type: currentSlide.type,
+      content: currentSlide.content as BroadcastFrame["content"],
+    })
+
+    // Clear terminal buffer for non-terminal slides
+    if (currentSlide.type !== "terminal") {
+      setTerminalBuffer("")
+    }
+
+    // Schedule advance to next slide
+    batchTimerRef.current = setTimeout(() => {
+      setBatchIndex((prev) => prev + 1)
+    }, currentSlide.duration_seconds * 1000)
+
+    return () => {
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current)
+        batchTimerRef.current = null
+      }
+    }
+  }, [isBatchPlaying, batchSlides, batchIndex, clearBatch, fetchQueue])
+
   useEffect(() => {
     if (!client) return
 
@@ -111,21 +170,34 @@ export function useBroadcast() {
       }
     })
 
-    // Slot start (old system)
+    // Batch handler — agent submitted all slides at once
+    liveChannel.subscribe("batch", (msg) => {
+      const data = msg.data as { slides: BatchSlide[]; total_duration_seconds: number; slide_count: number }
+      if (data.slides && data.slides.length > 0) {
+        setBatchSlides(data.slides)
+        setBatchIndex(0)
+        setIsBatchPlaying(true)
+        setTerminalBuffer("")
+      }
+    })
+
+    // Slot start
     liveChannel.subscribe("slot_start", (msg) => {
       const data = msg.data as SlotInfo
       setIsLive(true)
       setCurrentSlot(data)
       setLatestFrame(null)
       setTerminalBuffer("")
+      clearBatch()
     })
 
-    // Slot end (old system)
+    // Slot end
     liveChannel.subscribe("slot_end", () => {
       setIsLive(false)
       setCurrentSlot(null)
       setLatestFrame(null)
       setTerminalBuffer("")
+      clearBatch()
     })
 
     // Widget start (newer system)
@@ -139,6 +211,7 @@ export function useBroadcast() {
       })
       setLatestFrame(null)
       setTerminalBuffer("")
+      clearBatch()
     })
 
     // Widget end (newer system)
@@ -147,6 +220,7 @@ export function useBroadcast() {
       setCurrentSlot(null)
       setLatestFrame(null)
       setTerminalBuffer("")
+      clearBatch()
     })
 
     // Presence for viewer count
@@ -182,7 +256,7 @@ export function useBroadcast() {
       chatChannel.unsubscribe()
       liveChannel.presence.leave().catch(() => {})
     }
-  }, [client])
+  }, [client, clearBatch])
 
   return {
     connected,
@@ -194,5 +268,9 @@ export function useBroadcast() {
     chatMessages,
     queue,
     liveInfo,
+    // Batch state
+    isBatchPlaying,
+    batchSlides,
+    batchIndex,
   }
 }

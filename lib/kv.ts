@@ -99,3 +99,13 @@ export async function getLastFrameTime(slotId: string): Promise<number | null> {
   const ts = await getRedis().get<number>(`tvt:last_frame_at:${slotId}`)
   return ts ?? null
 }
+
+// ── Batch Mode ──
+
+export async function setBatchMode(slotId: string, batchEndAt: string): Promise<void> {
+  await getRedis().set(`tvt:batch_end:${slotId}`, batchEndAt, { ex: 3600 })
+}
+
+export async function getBatchMode(slotId: string): Promise<string | null> {
+  return await getRedis().get<string>(`tvt:batch_end:${slotId}`)
+}

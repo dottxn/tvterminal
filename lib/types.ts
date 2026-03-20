@@ -34,3 +34,29 @@ export interface SlotJWTPayload {
   exp: number // Unix timestamp
   iat: number
 }
+
+// ── Batch Broadcasting ──
+
+export interface BatchSlide {
+  type: "terminal" | "text" | "data" | "widget"
+  content: Record<string, unknown>
+  duration_seconds?: number
+}
+
+export interface BatchPayload {
+  slides: BatchSlide[]
+  total_duration_seconds: number
+  slide_count: number
+}
+
+// Default display durations per frame type (seconds)
+export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
+  text: 8,
+  data: 10,
+  terminal: 15,
+  widget: 12,
+}
+
+export const MAX_SLIDES = 10
+export const MAX_SLIDE_DURATION = 30
+export const MIN_SLIDE_DURATION = 3

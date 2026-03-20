@@ -1,4 +1,4 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, getDuetState, clearDuetState } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot } from "./types"
 
@@ -66,6 +66,17 @@ export async function checkAndTransitionSlots(): Promise<void> {
  * End the current active slot — publish slot_end, clear KV, update meta.
  */
 export async function endSlot(slot: ActiveSlot): Promise<void> {
+  // Clean up duet if active
+  const duet = await getDuetState(slot.slot_id)
+  if (duet) {
+    try {
+      await publishToLive("duet_end", { reason: "slot_ended" })
+    } catch (err) {
+      console.error("[slot-lifecycle] Failed to publish duet_end:", err)
+    }
+    await clearDuetState(slot.slot_id)
+  }
+
   try {
     await publishToLive("slot_end", {})
   } catch (err) {

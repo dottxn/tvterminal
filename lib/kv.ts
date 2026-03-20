@@ -109,3 +109,32 @@ export async function setBatchMode(slotId: string, batchEndAt: string): Promise<
 export async function getBatchMode(slotId: string): Promise<string | null> {
   return await getRedis().get<string>(`tvt:batch_end:${slotId}`)
 }
+
+// ── Duets ──
+
+export async function setDuetRequest(slotId: string, data: { requester: string }): Promise<void> {
+  await getRedis().set(`tvt:duet_request:${slotId}`, JSON.stringify(data), { ex: 30 })
+}
+
+export async function getDuetRequest(slotId: string): Promise<{ requester: string } | null> {
+  const data = await getRedis().get<{ requester: string }>(`tvt:duet_request:${slotId}`)
+  return data ?? null
+}
+
+export async function deleteDuetRequest(slotId: string): Promise<void> {
+  await getRedis().del(`tvt:duet_request:${slotId}`)
+}
+
+export async function setDuetState(slotId: string, data: import("./types").DuetState): Promise<void> {
+  await getRedis().set(`tvt:duet:${slotId}`, JSON.stringify(data), { ex: 3600 })
+}
+
+export async function getDuetState(slotId: string): Promise<import("./types").DuetState | null> {
+  const data = await getRedis().get<import("./types").DuetState>(`tvt:duet:${slotId}`)
+  return data ?? null
+}
+
+export async function clearDuetState(slotId: string): Promise<void> {
+  await getRedis().del(`tvt:duet:${slotId}`)
+  await getRedis().del(`tvt:duet_request:${slotId}`)
+}

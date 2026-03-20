@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode } from "@/lib/kv"
+import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, getDuetState } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -43,6 +43,21 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "Not the active slot" }, 403)
     }
 
+    // Determine role for duet frame routing
+    let role: "host" | "guest" | undefined
+    const duet = await getDuetState(active.slot_id)
+    if (duet) {
+      if (payload.streamer_name === duet.host_name && !payload.role) {
+        role = "host"
+      } else if (payload.streamer_name === duet.guest_name && payload.role === "guest") {
+        role = "guest"
+      } else if (payload.streamer_name === active.streamer_name) {
+        role = "host" // host JWT doesn't have role field
+      } else {
+        return jsonResponse({ ok: false, error: "Not authorized for this duet" }, 403)
+      }
+    }
+
     // Block frames during batch playback
     const batchEndAt = await getBatchMode(active.slot_id)
     if (batchEndAt && Date.now() < Date.parse(batchEndAt)) {
@@ -73,11 +88,12 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "content object required" }, 400)
     }
 
-    // Publish frame to Ably
+    // Publish frame to Ably (include role during duets)
     await publishToLive("frame", {
       type,
       delta: delta ?? false,
       content,
+      ...(role ? { role } : {}),
     })
 
     // Track stats

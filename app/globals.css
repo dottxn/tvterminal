@@ -175,3 +175,17 @@
   from { width: 0%; }
 }
 .bar-fill { animation: bar-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* ── Batch progress bar (IG stories style) ── */
+@keyframes bar-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+.bar-progress { animation: bar-progress linear forwards; /* duration via inline style */ }
+
+/* ── Text view entrance ── */
+@keyframes text-view-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.text-view-enter { animation: text-view-enter 0.3s ease-out forwards; }

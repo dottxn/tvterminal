@@ -15,6 +15,11 @@ export interface BroadcastFrame {
     rows?: Array<{ label: string; value: string; change?: string }>
     widget_url?: string
     widget_type?: string
+    // Text themes + overrides
+    theme?: "minimal" | "bold" | "neon" | "warm" | "matrix"
+    bg_color?: string
+    text_color?: string
+    accent_color?: string
   }
 }
 
@@ -61,6 +66,18 @@ function nameToColor(name: string): string {
   return colors[Math.abs(hash) % colors.length]
 }
 
+// Helper to clear all duet-related state
+function clearDuetDefaults() {
+  return {
+    duetState: null as { host: string; guest: string } | null,
+    duetRequest: null as { streamer_name: string; expires_at: number } | null,
+    hostFrame: null as BroadcastFrame | null,
+    guestFrame: null as BroadcastFrame | null,
+    hostTerminalBuffer: "",
+    guestTerminalBuffer: "",
+  }
+}
+
 export function useBroadcast() {
   const { client, connected } = useAbly()
   const [isLive, setIsLive] = useState(false)
@@ -78,6 +95,14 @@ export function useBroadcast() {
   const [isBatchPlaying, setIsBatchPlaying] = useState(false)
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Duet state
+  const [duetState, setDuetState] = useState<{ host: string; guest: string } | null>(null)
+  const [duetRequest, setDuetRequest] = useState<{ streamer_name: string; expires_at: number } | null>(null)
+  const [hostFrame, setHostFrame] = useState<BroadcastFrame | null>(null)
+  const [guestFrame, setGuestFrame] = useState<BroadcastFrame | null>(null)
+  const [hostTerminalBuffer, setHostTerminalBuffer] = useState("")
+  const [guestTerminalBuffer, setGuestTerminalBuffer] = useState("")
+
   // Poll /api/getQueue for real queue state
   const fetchQueue = useCallback(async () => {
     try {
@@ -93,7 +118,7 @@ export function useBroadcast() {
 
   useEffect(() => {
     fetchQueue()
-    const interval = setInterval(fetchQueue, 10000) // Poll every 10s
+    const interval = setInterval(fetchQueue, 10000)
     return () => clearInterval(interval)
   }, [fetchQueue])
 
@@ -113,30 +138,48 @@ export function useBroadcast() {
     setIsBatchPlaying(false)
   }, [])
 
-  // Batch auto-advance: when batchSlides or batchIndex changes, schedule next
+  // Clear duet state helper
+  const clearDuet = useCallback(() => {
+    setDuetState(null)
+    setDuetRequest(null)
+    setHostFrame(null)
+    setGuestFrame(null)
+    setHostTerminalBuffer("")
+    setGuestTerminalBuffer("")
+  }, [])
+
+  // Auto-dismiss duet request after expiry
+  useEffect(() => {
+    if (!duetRequest) return
+    const remaining = duetRequest.expires_at - Date.now()
+    if (remaining <= 0) {
+      setDuetRequest(null)
+      return
+    }
+    const timer = setTimeout(() => setDuetRequest(null), remaining)
+    return () => clearTimeout(timer)
+  }, [duetRequest])
+
+  // Batch auto-advance
   useEffect(() => {
     if (!isBatchPlaying || batchSlides.length === 0) return
 
     const currentSlide = batchSlides[batchIndex]
     if (!currentSlide) {
-      // Past the last slide — batch done
       clearBatch()
-      fetchQueue() // Pick up the slot end
+      fetchQueue()
       return
     }
 
-    // Set this slide as the current frame
     setLatestFrame({
       type: currentSlide.type,
       content: currentSlide.content as BroadcastFrame["content"],
     })
 
-    // Clear terminal buffer for non-terminal slides
     if (currentSlide.type !== "terminal") {
       setTerminalBuffer("")
     }
 
-    // Schedule advance to next slide
     batchTimerRef.current = setTimeout(() => {
       setBatchIndex((prev) => prev + 1)
     }, currentSlide.duration_seconds * 1000)
@@ -149,28 +192,49 @@ export function useBroadcast() {
     }
   }, [isBatchPlaying, batchSlides, batchIndex, clearBatch, fetchQueue])
 
+  // Ably subscriptions
   useEffect(() => {
     if (!client) return
 
     const liveChannel = client.channels.get("tvt:live")
     const chatChannel = client.channels.get("tvt:chat")
 
-    // Frame handler
+    // Frame handler — routes to duet halves if role is present
     liveChannel.subscribe("frame", (msg) => {
-      const frame = msg.data as BroadcastFrame
-      setLatestFrame(frame)
+      const frame = msg.data as BroadcastFrame & { role?: "host" | "guest" }
 
-      // Accumulate terminal content
-      if (frame.type === "terminal" && frame.content.screen) {
-        if (frame.delta) {
-          setTerminalBuffer((prev) => prev + frame.content.screen)
-        } else {
-          setTerminalBuffer(frame.content.screen ?? "")
+      if (frame.role === "host") {
+        setHostFrame(frame)
+        if (frame.type === "terminal" && frame.content.screen) {
+          if (frame.delta) {
+            setHostTerminalBuffer((prev) => prev + frame.content.screen)
+          } else {
+            setHostTerminalBuffer(frame.content.screen ?? "")
+          }
+        }
+      } else if (frame.role === "guest") {
+        setGuestFrame(frame)
+        if (frame.type === "terminal" && frame.content.screen) {
+          if (frame.delta) {
+            setGuestTerminalBuffer((prev) => prev + frame.content.screen)
+          } else {
+            setGuestTerminalBuffer(frame.content.screen ?? "")
+          }
+        }
+      } else {
+        // Regular (non-duet) frame
+        setLatestFrame(frame)
+        if (frame.type === "terminal" && frame.content.screen) {
+          if (frame.delta) {
+            setTerminalBuffer((prev) => prev + frame.content.screen)
+          } else {
+            setTerminalBuffer(frame.content.screen ?? "")
+          }
         }
       }
     })
 
-    // Batch handler — agent submitted all slides at once
+    // Batch handler
     liveChannel.subscribe("batch", (msg) => {
       const data = msg.data as { slides: BatchSlide[]; total_duration_seconds: number; slide_count: number }
       if (data.slides && data.slides.length > 0) {
@@ -181,6 +245,34 @@ export function useBroadcast() {
       }
     })
 
+    // Duet request (open invitation)
+    liveChannel.subscribe("duet_request", (msg) => {
+      const data = msg.data as { streamer_name: string; expires_in: number }
+      setDuetRequest({
+        streamer_name: data.streamer_name,
+        expires_at: Date.now() + data.expires_in * 1000,
+      })
+    })
+
+    // Duet accepted — split screen begins
+    liveChannel.subscribe("duet_start", (msg) => {
+      const data = msg.data as { host: string; guest: string }
+      setDuetState({ host: data.host, guest: data.guest })
+      setDuetRequest(null)
+      setGuestFrame(null)
+      setGuestTerminalBuffer("")
+    })
+
+    // Duet ends
+    liveChannel.subscribe("duet_end", () => {
+      setDuetState(null)
+      setDuetRequest(null)
+      setHostFrame(null)
+      setGuestFrame(null)
+      setHostTerminalBuffer("")
+      setGuestTerminalBuffer("")
+    })
+
     // Slot start
     liveChannel.subscribe("slot_start", (msg) => {
       const data = msg.data as SlotInfo
@@ -189,6 +281,7 @@ export function useBroadcast() {
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
+      clearDuet()
     })
 
     // Slot end
@@ -198,9 +291,10 @@ export function useBroadcast() {
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
+      clearDuet()
     })
 
-    // Widget start (newer system)
+    // Widget start
     liveChannel.subscribe("widget_start", (msg) => {
       const data = msg.data
       setIsLive(true)
@@ -212,15 +306,17 @@ export function useBroadcast() {
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
+      clearDuet()
     })
 
-    // Widget end (newer system)
+    // Widget end
     liveChannel.subscribe("widget_end", () => {
       setIsLive(false)
       setCurrentSlot(null)
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
+      clearDuet()
     })
 
     // Presence for viewer count
@@ -229,7 +325,7 @@ export function useBroadcast() {
         const members = await liveChannel.presence.get()
         setViewerCount(members.length)
       } catch {
-        // Silently fail — presence may not be available
+        // Silently fail
       }
     }
 
@@ -256,7 +352,7 @@ export function useBroadcast() {
       chatChannel.unsubscribe()
       liveChannel.presence.leave().catch(() => {})
     }
-  }, [client, clearBatch])
+  }, [client, clearBatch, clearDuet])
 
   return {
     connected,
@@ -272,5 +368,12 @@ export function useBroadcast() {
     isBatchPlaying,
     batchSlides,
     batchIndex,
+    // Duet state
+    duetState,
+    duetRequest,
+    hostFrame,
+    guestFrame,
+    hostTerminalBuffer,
+    guestTerminalBuffer,
   }
 }

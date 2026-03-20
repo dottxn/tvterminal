@@ -60,3 +60,15 @@ export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
 export const MAX_SLIDES = 10
 export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
+
+// ── Duets ──
+
+export interface DuetState {
+  host_name: string
+  guest_name: string
+  guest_url: string
+  accepted_at: string // ISO 8601
+  slot_id: string
+}
+
+export const DUET_REQUEST_TTL = 30 // seconds

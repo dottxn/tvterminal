@@ -15,7 +15,15 @@ export async function signSlotJWT(slotId: string, streamerName: string, expUnix:
     .sign(getSecret())
 }
 
-export async function verifySlotJWT(token: string): Promise<SlotJWTPayload> {
+export async function signGuestJWT(slotId: string, guestName: string, expUnix: number): Promise<string> {
+  return new SignJWT({ slot_id: slotId, streamer_name: guestName, role: "guest" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(expUnix)
+    .sign(getSecret())
+}
+
+export async function verifySlotJWT(token: string): Promise<SlotJWTPayload & { role?: string }> {
   const { payload } = await jwtVerify(token, getSecret())
-  return payload as unknown as SlotJWTPayload
+  return payload as unknown as SlotJWTPayload & { role?: string }
 }

@@ -1,27 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 
-const MOCK_MESSAGES = [
-  { user: "weather_oracle", color: "#E63946", text: "submitted a new narrative widget" },
-  { user: "benchbot",       color: "#00c853", text: "queued ask widget · 3rd in line" },
-  { user: "signal_watch",   color: "#ff7b00", text: "just registered" },
-  { user: "infra_analyst",  color: "#00b8d9", text: "going live in 3 min" },
-  { user: "petchaboys",     color: "#e91916", text: "is ON AIR now" },
-  { user: "disc0",          color: "#E63946", text: "claimed agent handle" },
-  { user: "molty958",       color: "#00c853", text: "submitted ask widget" },
-  { user: "txndott",        color: "#ff7b00", text: "queued narrative widget" },
-]
-
-const AGENT_JSON = `{
-  "type": "insight",
-  "pattern": "reduce_onboarding",
-  "context": {
-    "product_type": "consumer_app",
-    "user_intent": "low"
-  }
-}`
 
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase()
@@ -60,27 +41,11 @@ function formatTimeRemaining(seconds: number): string {
 }
 
 export default function RightSidebar() {
-  const { connected, viewerCount, chatMessages, isLive, currentSlot, liveInfo, queue } = useBroadcastContext()
+  const { connected, viewerCount, chatMessages, isLive, currentSlot, liveInfo, queue, latestFrame } = useBroadcastContext()
 
-  // Mock message cycling (fallback when no real messages)
-  const [mockMessages, setMockMessages] = useState(MOCK_MESSAGES.slice(0, 4))
   const chatRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (chatMessages.length > 0) return
-    let idx = 4
-    const interval = setInterval(() => {
-      idx = idx % MOCK_MESSAGES.length
-      const next = MOCK_MESSAGES[idx]
-      if (next) setMockMessages(prev => [...prev.slice(-6), next])
-      idx++
-    }, 2800)
-    return () => clearInterval(interval)
-  }, [chatMessages.length])
-
-  const displayMessages = chatMessages.length > 0
-    ? chatMessages.map(m => ({ user: m.name, color: m.color ?? "#E63946", text: m.text }))
-    : mockMessages
+  const displayMessages = chatMessages.map(m => ({ user: m.name, color: m.color ?? "#E63946", text: m.text }))
 
   // Auto-scroll activity feed
   useEffect(() => {
@@ -186,22 +151,35 @@ export default function RightSidebar() {
             </span>
           </div>
           <div ref={chatRef} className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
-            {displayMessages.filter(Boolean).map((m, i) => (
-              <div key={i} className="flex gap-2 items-start msg-in">
-                <span className="text-[11px] font-mono font-semibold shrink-0" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
-                <span className="text-[11px] text-[#6b6b7a] font-sans leading-relaxed">{m.text}</span>
-              </div>
-            ))}
+            {displayMessages.length > 0 ? (
+              displayMessages.map((m, i) => (
+                <div key={i} className="flex gap-2 items-start msg-in">
+                  <span className="text-[11px] font-mono font-semibold shrink-0" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
+                  <span className="text-[11px] text-[#6b6b7a] font-sans leading-relaxed">{m.text}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-[11px] text-[#3a3a48] font-mono">No activity yet</p>
+            )}
           </div>
         </div>
 
-        {/* Agent View */}
+        {/* Agent View — raw JSON of current frame */}
         <div className="px-4 pb-5 mt-auto">
           <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a] mb-2">Agent view</p>
-          <p className="text-[11px] text-[#6b6b7a] leading-relaxed mb-2.5 font-sans">Registered agents receive this payload.</p>
-          <div className="bg-[#0e0e10] p-3">
-            <div className="text-[9px] text-[#E63946]/60 uppercase tracking-[0.1em] mb-2 font-sans">JSON payload</div>
-            <pre className="text-[10px] font-mono text-[#adadb8] leading-relaxed whitespace-pre">{AGENT_JSON}</pre>
+          <p className="text-[11px] text-[#6b6b7a] leading-relaxed mb-2.5 font-sans">
+            {latestFrame ? "Live frame payload" : "Agents receive this data via Ably."}
+          </p>
+          <div className="bg-[#0e0e10] p-3 max-h-[200px] overflow-y-auto">
+            <div className="text-[9px] text-[#E63946]/60 uppercase tracking-[0.1em] mb-2 font-sans">
+              {latestFrame ? `${latestFrame.type} frame` : "waiting"}
+            </div>
+            <pre className="text-[10px] font-mono text-[#adadb8] leading-relaxed whitespace-pre">
+              {latestFrame
+                ? JSON.stringify(latestFrame, null, 2)
+                : "{ }"
+              }
+            </pre>
           </div>
         </div>
       </aside>
@@ -247,12 +225,16 @@ export default function RightSidebar() {
             </span>
           </div>
           <div className="flex flex-col gap-1.5 overflow-hidden max-h-[140px]">
-            {displayMessages.filter(Boolean).slice(-5).map((m, i) => (
-              <div key={i} className="flex gap-1.5 items-start">
-                <span className="text-[10px] font-mono font-semibold shrink-0 truncate max-w-[72px]" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
-                <span className="text-[10px] text-[#6b6b7a] font-sans leading-relaxed truncate">{m.text}</span>
-              </div>
-            ))}
+            {displayMessages.length > 0 ? (
+              displayMessages.slice(-5).map((m, i) => (
+                <div key={i} className="flex gap-1.5 items-start">
+                  <span className="text-[10px] font-mono font-semibold shrink-0 truncate max-w-[72px]" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
+                  <span className="text-[10px] text-[#6b6b7a] font-sans leading-relaxed truncate">{m.text}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-[10px] text-[#3a3a48] font-mono">No activity yet</p>
+            )}
           </div>
         </div>
       </div>

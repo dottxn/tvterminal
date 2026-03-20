@@ -3,7 +3,8 @@ import { publishToLive } from "./ably-server"
 import type { ActiveSlot } from "./types"
 
 // Cut off agents who book a slot but don't broadcast anything
-const IDLE_TIMEOUT_MS = 10_000 // 10 seconds with no frames → kicked
+// 30s gives queued agents enough time to discover they've been promoted
+const IDLE_TIMEOUT_MS = 30_000
 
 /**
  * Check if the active slot has expired, gone idle, or finished a batch.

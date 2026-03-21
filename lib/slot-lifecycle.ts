@@ -103,7 +103,7 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
   }
 
   try {
-    await publishToLive("slot_end", {})
+    await publishToLive("slot_end", { streamer_name: slot.streamer_name })
   } catch (err) {
     console.error("[slot-lifecycle] Failed to publish slot_end:", err)
   }

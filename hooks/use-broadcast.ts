@@ -214,6 +214,14 @@ export function useBroadcast() {
     setDuetTurn(0)
   }, [])
 
+  // Push an activity log entry (appears in the sidebar activity feed)
+  const pushActivity = useCallback((name: string, text: string) => {
+    setChatMessages((prev) => [
+      ...prev.slice(-30),
+      { name, text, color: nameToColor(name), timestamp: Date.now() },
+    ])
+  }, [])
+
   // Auto-dismiss duet request after expiry
   useEffect(() => {
     if (!duetRequest) return
@@ -335,6 +343,7 @@ export function useBroadcast() {
         question: data.question || "",
         expires_at: Date.now() + data.expires_in * 1000,
       })
+      pushActivity(data.streamer_name, "is looking for a duet partner")
     })
 
     // Duet accepted — structured conversation begins
@@ -348,12 +357,14 @@ export function useBroadcast() {
       })
       setDuetRequest(null)
       setDuetReply(null)
+      pushActivity(data.guest, "joined " + data.host + "'s duet")
     })
 
     // Host's reply arrives
     liveChannel.subscribe("duet_reply", (msg) => {
       const data = msg.data as { host: string; reply: string }
       setDuetReply(data.reply)
+      pushActivity(data.host, "replied in the duet")
     })
 
     // Duet ends
@@ -375,16 +386,19 @@ export function useBroadcast() {
       }
       setIsLive(true)
       setCurrentSlot(data)
-      // Don't clear latestFrame here — let the next batch/frame event replace it
-      // This prevents the brief idle flash between slot transitions
       setTerminalBuffer("")
       clearBatch()
       clearDuet()
+      pushActivity(data.streamer_name, "went live")
     })
 
     // Slot end — only clear visual state if no next slot is imminent
     // The next slot_start will handle the transition smoothly
-    liveChannel.subscribe("slot_end", () => {
+    liveChannel.subscribe("slot_end", (msg) => {
+      const data = msg.data as { streamer_name?: string }
+      if (data.streamer_name) {
+        pushActivity(data.streamer_name, "finished broadcasting")
+      }
       clearBatch()
       clearDuet()
       // Delay clearing the visual state to allow the next slot_start to arrive
@@ -442,7 +456,7 @@ export function useBroadcast() {
     chatChannel.subscribe("msg", (msg) => {
       const data = msg.data as { name: string; text: string; source?: string }
       setChatMessages((prev) => [
-        ...prev.slice(-20),
+        ...prev.slice(-30),
         {
           name: data.name,
           text: data.text,
@@ -457,7 +471,7 @@ export function useBroadcast() {
       chatChannel.unsubscribe()
       liveChannel.presence.leave().catch(() => {})
     }
-  }, [client, clearBatch, clearDuet])
+  }, [client, clearBatch, clearDuet, pushActivity])
 
   return {
     connected,

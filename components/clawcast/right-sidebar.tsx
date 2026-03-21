@@ -114,7 +114,7 @@ export default function RightSidebar() {
 
         {/* Queue */}
         <div className="px-4 pb-4">
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a] mb-3">
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-3">
             {hasQueue ? "On air & queue" : "Queue"}
           </p>
           {hasQueue ? (
@@ -124,28 +124,28 @@ export default function RightSidebar() {
                   <AgentAvatar name={q.name} color={q.color} live={q.live} />
                   <div className="flex-1 min-w-0 leading-tight">
                     <span className={["text-[12px] font-mono block truncate leading-none", q.live ? "text-[#efeff1] font-semibold" : "text-[#adadb8]"].join(" ")}>{q.name}</span>
-                    <span className="text-[9px] text-[#6b6b7a] font-sans leading-none">{q.detail}</span>
+                    <span className="text-[9px] text-[#7a7a8a] font-sans leading-none">{q.detail}</span>
                   </div>
                   {q.live ? (
                     <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#e91916] bg-[#e91916]/10 px-1.5 py-0.5 font-sans shrink-0">LIVE</span>
                   ) : (
-                    <span className="text-[10px] font-mono text-[#3a3a48] shrink-0">#{i + (liveInfo || (isLive && currentSlot) ? 0 : 1)}</span>
+                    <span className="text-[10px] font-mono text-[#53535f] shrink-0">#{i + (liveInfo || (isLive && currentSlot) ? 0 : 1)}</span>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[11px] text-[#3a3a48] font-mono">No agents in queue</p>
+            <p className="text-[11px] text-[#53535f] font-mono">No agents in queue</p>
           )}
         </div>
 
         {/* Activity */}
         <div className="flex flex-col px-4 pb-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a]">Activity</p>
+            <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a]">Activity</p>
             <span className="flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[#00c853]" : "bg-[#6b6b7a]"} ${connected ? "live-pulse" : ""}`} />
-              <span className={`text-[9px] font-mono ${connected ? "text-[#00c853]" : "text-[#6b6b7a]"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[#00c853]" : "bg-[#7a7a8a]"} ${connected ? "live-pulse" : ""}`} />
+              <span className={`text-[9px] font-mono ${connected ? "text-[#00c853]" : "text-[#7a7a8a]"}`}>
                 {connected ? "connected" : "offline"}
               </span>
             </span>
@@ -155,19 +155,19 @@ export default function RightSidebar() {
               displayMessages.map((m, i) => (
                 <div key={i} className="flex gap-2 items-start msg-in">
                   <span className="text-[11px] font-mono font-semibold shrink-0" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
-                  <span className="text-[11px] text-[#6b6b7a] font-sans leading-relaxed">{m.text}</span>
+                  <span className="text-[11px] text-[#7a7a8a] font-sans leading-relaxed">{m.text}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[11px] text-[#3a3a48] font-mono">No activity yet</p>
+              <p className="text-[11px] text-[#53535f] font-mono">No activity yet</p>
             )}
           </div>
         </div>
 
         {/* Agent View — raw JSON of current frame */}
         <div className="px-4 pb-5 mt-auto">
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a] mb-2">Agent view</p>
-          <p className="text-[11px] text-[#6b6b7a] leading-relaxed mb-2.5 font-sans">
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-2">Agent view</p>
+          <p className="text-[11px] text-[#7a7a8a] leading-relaxed mb-2.5 font-sans">
             {latestFrame ? "Live frame payload" : "Agents receive this data via Ably."}
           </p>
           <div className="bg-[#0e0e10] p-3 max-h-[200px] overflow-y-auto">
@@ -189,7 +189,7 @@ export default function RightSidebar() {
 
         {/* Up next */}
         <div className="flex-1 bg-[#18181b] px-3 pt-3 pb-2">
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a] mb-2">
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-2">
             {hasQueue ? "On air & queue" : "Queue"}
           </p>
           {hasQueue ? (
@@ -199,27 +199,27 @@ export default function RightSidebar() {
                   <AgentAvatar name={q.name} color={q.color} live={q.live} />
                   <div className="flex-1 min-w-0 leading-tight">
                     <span className={["text-[11px] font-mono block truncate leading-none", q.live ? "text-[#efeff1] font-semibold" : "text-[#adadb8]"].join(" ")}>{q.name}</span>
-                    <span className="text-[9px] text-[#6b6b7a] font-sans leading-none">{q.detail}</span>
+                    <span className="text-[9px] text-[#7a7a8a] font-sans leading-none">{q.detail}</span>
                   </div>
                   {q.live
                     ? <span className="text-[8px] font-bold text-[#e91916] shrink-0">LIVE</span>
-                    : <span className="text-[9px] font-mono text-[#3a3a48] shrink-0">#{i + (liveInfo || (isLive && currentSlot) ? 0 : 1)}</span>
+                    : <span className="text-[9px] font-mono text-[#53535f] shrink-0">#{i + (liveInfo || (isLive && currentSlot) ? 0 : 1)}</span>
                   }
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-[#3a3a48] font-mono">No agents in queue</p>
+            <p className="text-[10px] text-[#53535f] font-mono">No agents in queue</p>
           )}
         </div>
 
         {/* Activity */}
         <div className="flex-1 bg-[#18181b] px-3 pt-3 pb-2">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#6b6b7a]">Activity</p>
+            <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a]">Activity</p>
             <span className="flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[#00c853]" : "bg-[#6b6b7a]"} ${connected ? "live-pulse" : ""}`} />
-              <span className={`text-[9px] font-mono ${connected ? "text-[#00c853]" : "text-[#6b6b7a]"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[#00c853]" : "bg-[#7a7a8a]"} ${connected ? "live-pulse" : ""}`} />
+              <span className={`text-[9px] font-mono ${connected ? "text-[#00c853]" : "text-[#7a7a8a]"}`}>
                 {connected ? "connected" : "offline"}
               </span>
             </span>
@@ -229,11 +229,11 @@ export default function RightSidebar() {
               displayMessages.slice(-5).map((m, i) => (
                 <div key={i} className="flex gap-1.5 items-start">
                   <span className="text-[10px] font-mono font-semibold shrink-0 truncate max-w-[72px]" style={{ color: m.color ?? "#E63946" }}>{m.user}</span>
-                  <span className="text-[10px] text-[#6b6b7a] font-sans leading-relaxed truncate">{m.text}</span>
+                  <span className="text-[10px] text-[#7a7a8a] font-sans leading-relaxed truncate">{m.text}</span>
                 </div>
               ))
             ) : (
-              <p className="text-[10px] text-[#3a3a48] font-mono">No activity yet</p>
+              <p className="text-[10px] text-[#53535f] font-mono">No activity yet</p>
             )}
           </div>
         </div>

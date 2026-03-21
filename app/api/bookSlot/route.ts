@@ -4,21 +4,25 @@ import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPe
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 import { validateSlides } from "@/lib/types"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
-export async function OPTIONS() {
-  return optionsResponse()
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
 }
 
 export async function POST(req: Request) {
   try {
+    const rl = await rateLimit(req, "write")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
+
     // Check config
     if (!process.env.ABLY_API_KEY) {
-      return jsonResponse({ ok: false, error: "Ably not configured" }, 503)
+      return jsonResponse({ ok: false, error: "Ably not configured" }, 503, req)
     }
     if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503)
+      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
     }
 
     // Parse + validate
@@ -31,17 +35,17 @@ export async function POST(req: Request) {
     }
 
     if (!streamer_name || typeof streamer_name !== "string" || !/^[\w.-]{1,50}$/.test(streamer_name)) {
-      return jsonResponse({ ok: false, error: "streamer_name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400)
+      return jsonResponse({ ok: false, error: "streamer_name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
     }
 
     if (!streamer_url || typeof streamer_url !== "string") {
-      return jsonResponse({ ok: false, error: "streamer_url required" }, 400)
+      return jsonResponse({ ok: false, error: "streamer_url required" }, 400, req)
     }
 
     try {
       new URL(streamer_url)
     } catch {
-      return jsonResponse({ ok: false, error: "streamer_url must be a valid URL" }, 400)
+      return jsonResponse({ ok: false, error: "streamer_url must be a valid URL" }, 400, req)
     }
 
     const duration = Math.min(3, Math.max(1, Math.round(duration_minutes ?? 1)))
@@ -53,7 +57,7 @@ export async function POST(req: Request) {
     if (slides && Array.isArray(slides) && slides.length > 0) {
       const result = validateSlides(slides)
       if ("error" in result) {
-        return jsonResponse({ ok: false, error: result.error }, 400)
+        return jsonResponse({ ok: false, error: result.error }, 400, req)
       }
       validatedSlides = result.slides
       batchTotalDuration = result.totalDuration
@@ -207,12 +211,13 @@ export async function POST(req: Request) {
       // Best-effort — don't fail the booking for an activity message
     }
 
-    return jsonResponse(response)
+    return jsonResponse(response, 200, req)
   } catch (err) {
     console.error("[bookSlot]", err)
     return jsonResponse(
       { ok: false, error: err instanceof Error ? err.message : "Internal error" },
       500,
+      req,
     )
   }
 }

@@ -3,27 +3,31 @@ import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime,
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 
 const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget"])
 
-export async function OPTIONS() {
-  return optionsResponse()
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
 }
 
 export async function POST(req: Request) {
   try {
+    const rl = await rateLimit(req, "write")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
+
     // Check config
     if (!process.env.ABLY_API_KEY) {
-      return jsonResponse({ ok: false, error: "Ably not configured" }, 503)
+      return jsonResponse({ ok: false, error: "Ably not configured" }, 503, req)
     }
     if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503)
+      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
     }
 
     // Extract + verify JWT
     const authHeader = req.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return jsonResponse({ ok: false, error: "Authorization header required (Bearer <slot_jwt>)" }, 401)
+      return jsonResponse({ ok: false, error: "Authorization header required (Bearer <slot_jwt>)" }, 401, req)
     }
 
     const token = authHeader.slice(7)
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
     try {
       payload = await verifySlotJWT(token)
     } catch {
-      return jsonResponse({ ok: false, error: "Invalid or expired JWT" }, 401)
+      return jsonResponse({ ok: false, error: "Invalid or expired JWT" }, 401, req)
     }
 
     // Ensure state is current
@@ -40,19 +44,19 @@ export async function POST(req: Request) {
     // Check this slot is the active one
     const active = await getActiveSlot()
     if (!active || active.slot_id !== payload.slot_id) {
-      return jsonResponse({ ok: false, error: "Not the active slot" }, 403)
+      return jsonResponse({ ok: false, error: "Not the active slot" }, 403, req)
     }
 
     // Block frames during active duet (conversation is handled via requestDuet/acceptDuet/duetReply)
     const duet = await getDuetState(active.slot_id)
     if (duet) {
-      return jsonResponse({ ok: false, error: "Cannot publish frames during a duet. Use /api/duetReply for the host reply." }, 409)
+      return jsonResponse({ ok: false, error: "Cannot publish frames during a duet. Use /api/duetReply for the host reply." }, 409, req)
     }
 
     // Block frames during batch playback
     const batchEndAt = await getBatchMode(active.slot_id)
     if (batchEndAt && Date.now() < Date.parse(batchEndAt)) {
-      return jsonResponse({ ok: false, error: "Batch is currently playing. Cannot push individual frames during batch playback." }, 409)
+      return jsonResponse({ ok: false, error: "Batch is currently playing. Cannot push individual frames during batch playback." }, 409, req)
     }
 
     // Check time remaining
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
     const secondsRemaining = Math.max(0, Math.floor((slotEnd - now) / 1000))
 
     if (secondsRemaining <= 0) {
-      return jsonResponse({ ok: false, error: "Slot expired" }, 403)
+      return jsonResponse({ ok: false, error: "Slot expired" }, 403, req)
     }
 
     // Parse and validate frame
@@ -73,10 +77,10 @@ export async function POST(req: Request) {
     }
 
     if (!type || !VALID_FRAME_TYPES.has(type)) {
-      return jsonResponse({ ok: false, error: `type must be one of: ${[...VALID_FRAME_TYPES].join(", ")}` }, 400)
+      return jsonResponse({ ok: false, error: `type must be one of: ${[...VALID_FRAME_TYPES].join(", ")}` }, 400, req)
     }
     if (!content || typeof content !== "object") {
-      return jsonResponse({ ok: false, error: "content object required" }, 400)
+      return jsonResponse({ ok: false, error: "content object required" }, 400, req)
     }
 
     // Publish frame to Ably
@@ -99,12 +103,13 @@ export async function POST(req: Request) {
       frame_count: frameCount,
       viewer_count: viewerCount,
       seconds_remaining: secondsRemaining,
-    })
+    }, 200, req)
   } catch (err) {
     console.error("[publishFrame]", err)
     return jsonResponse(
       { ok: false, error: err instanceof Error ? err.message : "Internal error" },
       500,
+      req,
     )
   }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+export {}
 
 /**
  * ClawCast.tv — Automated Broadcast Test Suite

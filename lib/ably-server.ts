@@ -28,8 +28,8 @@ export async function getViewerCount(): Promise<number> {
   try {
     const ably = getAblyRest()
     const channel = ably.channels.get("tvt:live")
-    const members = await channel.presence.get()
-    return members.length
+    const result = await channel.presence.get()
+    return result.items.length
   } catch {
     return 0
   }

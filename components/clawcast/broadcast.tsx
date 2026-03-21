@@ -22,7 +22,7 @@ const TEXT_THEMES = {
     bg: "transparent",
     headline: "#efeff1",
     body: "#adadb8",
-    meta: "#6b6b7a",
+    meta: "#7a7a8a",
     font: "font-sans",
     headlineFont: "font-sans",
     headlineSize: "text-[clamp(24px,3.5vw,36px)]",
@@ -198,7 +198,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
     <div className="flex flex-col gap-2 p-6 w-full max-w-[500px]">
       {content.rows?.map((row, i) => (
         <div key={i} className="flex justify-between items-baseline py-2 border-b border-[#2a2a35]">
-          <span className="text-[12px] font-sans text-[#6b6b7a]">{row.label}</span>
+          <span className="text-[12px] font-sans text-[#7a7a8a]">{row.label}</span>
           <div className="flex items-baseline gap-2">
             <span className="text-[14px] font-mono text-[#efeff1] tabular-nums">{row.value}</span>
             {row.change && (
@@ -216,7 +216,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
 
 function IdleView() {
   return (
-    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#3a3a48]">
+    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#53535f]">
       waiting for broadcast
     </span>
   )
@@ -315,13 +315,13 @@ function DuetInviteCard({ name, question, expiresAt }: { name: string; question:
           {"\u201C"}{question.length > 120 ? question.slice(0, 120) + "..." : question}{"\u201D"}
         </p>
       )}
-      <div className="h-[2px] bg-[#3a3a48] rounded-full overflow-hidden">
+      <div className="h-[2px] bg-[#53535f] rounded-full overflow-hidden">
         <div
           className="h-full bg-[#00e5b0] rounded-full transition-all duration-1000 ease-linear"
           style={{ width: `${(remaining / 30) * 100}%` }}
         />
       </div>
-      <span className="text-[10px] font-mono text-[#6b6b7a] mt-1 block">{remaining}s remaining</span>
+      <span className="text-[10px] font-mono text-[#7a7a8a] mt-1 block">{remaining}s remaining</span>
     </div>
   )
 }
@@ -373,7 +373,7 @@ function DuetConversation({
                 >
                   {turn.label}
                 </span>
-                <span className="text-[12px] font-mono text-[#6b6b7a]">{turn.speaker}</span>
+                <span className="text-[12px] font-mono text-[#7a7a8a]">{turn.speaker}</span>
               </div>
               <p className={`${isCurrent ? "text-[18px]" : "text-[15px]"} font-sans leading-relaxed text-[#efeff1]`}>
                 {turn.text}
@@ -436,11 +436,11 @@ export default function Broadcast() {
 
         {/* live dot */}
         <span className={`inline-block w-[10px] h-[10px] rounded-full shrink-0 ${
-          isLive || liveInfo ? "live-pulse bg-[#e91916]" : "bg-[#3a3a48]"
+          isLive || liveInfo ? "live-pulse bg-[#e91916]" : "bg-[#53535f]"
         }`} />
 
         {/* label + chips */}
-        <div className="flex items-center gap-3 text-[13px] text-[#6b6b7a] font-sans">
+        <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
           {displayName ? (
             <>
               <span>{duetState ? "Duet" : "Live now"}</span>
@@ -453,7 +453,7 @@ export default function Broadcast() {
                 </span>
               )}
               {liveInfo && (
-                <span className="text-[11px] font-mono text-[#6b6b7a] tabular-nums">
+                <span className="text-[11px] font-mono text-[#7a7a8a] tabular-nums">
                   {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")} left
                 </span>
               )}

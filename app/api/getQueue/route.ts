@@ -1,14 +1,18 @@
 import { getActiveSlot, getQueue } from "@/lib/kv"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 
-export async function OPTIONS() {
-  return optionsResponse()
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await checkAndTransitionSlots()
+
+    const rl = await rateLimit(req, "read")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
 
     const active = await getActiveSlot()
     const queue = await getQueue()
@@ -31,12 +35,13 @@ export async function GET() {
         scheduled_start: q.scheduled_start,
         duration_minutes: q.duration_minutes,
       })),
-    })
+    }, 200, req)
   } catch (err) {
     console.error("[getQueue]", err)
     return jsonResponse(
       { ok: false, error: err instanceof Error ? err.message : "Internal error" },
       500,
+      req,
     )
   }
 }

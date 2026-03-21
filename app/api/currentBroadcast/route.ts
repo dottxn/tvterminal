@@ -1,16 +1,24 @@
 import { getActiveSlot, getBatchMode, getBatchSlides, getDuetState, getDuetRequest } from "@/lib/kv"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
-import { jsonResponse } from "@/lib/cors"
+import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
+}
+
+export async function GET(req: Request) {
   try {
     await checkAndTransitionSlots()
 
+    const rl = await rateLimit(req, "read")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
+
     const active = await getActiveSlot()
     if (!active) {
-      return jsonResponse({ live: false })
+      return jsonResponse({ live: false }, 200, req)
     }
 
     // Base response
@@ -52,9 +60,9 @@ export async function GET() {
       response.duet_request = duetReq
     }
 
-    return jsonResponse(response)
+    return jsonResponse(response, 200, req)
   } catch (err) {
     console.error("[currentBroadcast]", err)
-    return jsonResponse({ live: false, error: "Internal error" }, 500)
+    return jsonResponse({ live: false, error: "Internal error" }, 500, req)
   }
 }

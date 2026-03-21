@@ -3,17 +3,21 @@ import { getActiveSlot, getDuetState, getDuetRequest, deleteDuetRequest, setDuet
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 
 const NAME_RE = /^[\w.-]{1,50}$/
 
-export async function OPTIONS() {
-  return optionsResponse()
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
 }
 
 export async function POST(req: Request) {
   try {
+    const rl = await rateLimit(req, "write")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
+
     if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503)
+      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
     }
 
     // Parse body
@@ -21,15 +25,15 @@ export async function POST(req: Request) {
     const { name, url, answer } = body as { name?: string; url?: string; answer?: string }
 
     if (!name || !NAME_RE.test(name)) {
-      return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400)
+      return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
     }
     if (!url || typeof url !== "string") {
-      return jsonResponse({ ok: false, error: "url required" }, 400)
+      return jsonResponse({ ok: false, error: "url required" }, 400, req)
     }
     try {
       new URL(url)
     } catch {
-      return jsonResponse({ ok: false, error: "url must be a valid URL" }, 400)
+      return jsonResponse({ ok: false, error: "url must be a valid URL" }, 400, req)
     }
 
     const answerText = (typeof answer === "string" && answer.trim().length > 0)
@@ -42,24 +46,24 @@ export async function POST(req: Request) {
     // Check active slot
     const active = await getActiveSlot()
     if (!active) {
-      return jsonResponse({ ok: false, error: "No active slot" }, 404)
+      return jsonResponse({ ok: false, error: "No active slot" }, 404, req)
     }
 
     // Check there's an open duet request
     const request = await getDuetRequest(active.slot_id)
     if (!request) {
-      return jsonResponse({ ok: false, error: "No duet request available" }, 404)
+      return jsonResponse({ ok: false, error: "No duet request available" }, 404, req)
     }
 
     // Can't join your own duet
     if (name === active.streamer_name) {
-      return jsonResponse({ ok: false, error: "Cannot duet with yourself" }, 400)
+      return jsonResponse({ ok: false, error: "Cannot duet with yourself" }, 400, req)
     }
 
     // Check no duet already active
     const existingDuet = await getDuetState(active.slot_id)
     if (existingDuet) {
-      return jsonResponse({ ok: false, error: "Duet already in progress" }, 409)
+      return jsonResponse({ ok: false, error: "Duet already in progress" }, 409, req)
     }
 
     // Accept the duet
@@ -99,12 +103,13 @@ export async function POST(req: Request) {
       guest_jwt: guestJwt,
       host: active.streamer_name,
       slot_end: active.slot_end,
-    })
+    }, 200, req)
   } catch (err) {
     console.error("[acceptDuet]", err)
     return jsonResponse(
       { ok: false, error: err instanceof Error ? err.message : "Internal error" },
       500,
+      req,
     )
   }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+export {}
 
 /**
  * ClawCast.tv — Stress Test (Book-With-Content)

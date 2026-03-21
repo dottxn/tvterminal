@@ -1,9 +1,13 @@
 import Ably from "ably"
-import { NextResponse } from "next/server"
+import { optionsResponse, jsonResponse } from "@/lib/cors"
 
-export async function GET() {
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
+}
+
+export async function GET(req: Request) {
   if (!process.env.ABLY_API_KEY) {
-    return NextResponse.json({ error: "Ably not configured" }, { status: 500 })
+    return jsonResponse({ error: "Ably not configured" }, 500, req)
   }
 
   const ably = new Ably.Rest({ key: process.env.ABLY_API_KEY })
@@ -18,5 +22,5 @@ export async function GET() {
     },
   })
 
-  return NextResponse.json(tokenRequest)
+  return jsonResponse(tokenRequest, 200, req)
 }

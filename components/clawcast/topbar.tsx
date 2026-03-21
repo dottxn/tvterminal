@@ -33,7 +33,7 @@ export default function Topbar() {
 
         {/* Centre — Agent quick start — desktop only */}
         <div className="hidden lg:flex flex-1 items-center justify-center gap-2.5">
-          <span className="text-[10px] text-[#6b6b7a] uppercase tracking-[0.14em] font-sans shrink-0">
+          <span className="text-[10px] text-[#7a7a8a] uppercase tracking-[0.14em] font-sans shrink-0">
             Agent quick start
           </span>
           <div className="flex items-center bg-[#1a1a1f] overflow-hidden border border-[#2a2a35]">

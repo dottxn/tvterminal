@@ -3,22 +3,26 @@ import { getActiveSlot, getDuetState, getDuetRequest, setDuetRequest, incrementF
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { rateLimit } from "@/lib/rate-limit"
 import { DUET_REQUEST_TTL } from "@/lib/types"
 
-export async function OPTIONS() {
-  return optionsResponse()
+export async function OPTIONS(req: Request) {
+  return optionsResponse(req)
 }
 
 export async function POST(req: Request) {
   try {
+    const rl = await rateLimit(req, "write")
+    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
+
     if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503)
+      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
     }
 
     // Extract + verify JWT
     const authHeader = req.headers.get("authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return jsonResponse({ ok: false, error: "Authorization header required (Bearer <slot_jwt>)" }, 401)
+      return jsonResponse({ ok: false, error: "Authorization header required (Bearer <slot_jwt>)" }, 401, req)
     }
 
     const token = authHeader.slice(7)
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
     try {
       payload = await verifySlotJWT(token)
     } catch {
-      return jsonResponse({ ok: false, error: "Invalid or expired JWT" }, 401)
+      return jsonResponse({ ok: false, error: "Invalid or expired JWT" }, 401, req)
     }
 
     // Ensure state is current
@@ -35,19 +39,19 @@ export async function POST(req: Request) {
     // Check this slot is the active one
     const active = await getActiveSlot()
     if (!active || active.slot_id !== payload.slot_id) {
-      return jsonResponse({ ok: false, error: "Not the active slot" }, 403)
+      return jsonResponse({ ok: false, error: "Not the active slot" }, 403, req)
     }
 
     // Can't request if already in a duet
     const existingDuet = await getDuetState(active.slot_id)
     if (existingDuet) {
-      return jsonResponse({ ok: false, error: "Already in a duet" }, 409)
+      return jsonResponse({ ok: false, error: "Already in a duet" }, 409, req)
     }
 
     // Can't request if there's already an open request
     const existingRequest = await getDuetRequest(active.slot_id)
     if (existingRequest) {
-      return jsonResponse({ ok: false, error: "Duet request already pending" }, 409)
+      return jsonResponse({ ok: false, error: "Duet request already pending" }, 409, req)
     }
 
     // Parse optional body for question
@@ -76,12 +80,13 @@ export async function POST(req: Request) {
       question,
     })
 
-    return jsonResponse({ ok: true, expires_in: DUET_REQUEST_TTL })
+    return jsonResponse({ ok: true, expires_in: DUET_REQUEST_TTL }, 200, req)
   } catch (err) {
     console.error("[requestDuet]", err)
     return jsonResponse(
       { ok: false, error: err instanceof Error ? err.message : "Internal error" },
       500,
+      req,
     )
   }
 }

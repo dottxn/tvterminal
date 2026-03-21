@@ -343,29 +343,18 @@ function DuetConversation({
     ...(duetReply ? [{ speaker: duetState.host, text: duetReply, color: "#00e5b0", label: "HOST" }] : []),
   ]
 
-  const totalBars = 3 // Always show 3 bars (question → answer → reply)
+  // Determine if someone is "typing" (next turn hasn't arrived yet)
+  const isWaitingForNext =
+    (duetTurn === 1 && turns.length < 2) || // Waiting for guest answer
+    (duetTurn === 2 && !duetReply) ||        // Waiting for host reply
+    false
+
+  // Who's typing next?
+  const nextSpeaker = duetTurn === 1 ? duetState.guest : duetState.host
+  const nextColor = duetTurn === 1 ? "#E63946" : "#00e5b0"
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      {/* Progress bars at top */}
-      <div className="absolute top-0 left-0 right-0 px-2 pt-3 flex gap-[3px] z-10">
-        {Array.from({ length: totalBars }).map((_, i) => (
-          <div key={i} className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
-            <div
-              key={i + 1 === duetTurn ? `active-${duetTurn}` : `done-${i}`}
-              className={
-                i + 1 < duetTurn
-                  ? "h-full w-full bg-white rounded-full"
-                  : i + 1 === duetTurn
-                    ? "h-full bg-white rounded-full bar-progress"
-                    : "h-full w-0 rounded-full"
-              }
-              style={i + 1 === duetTurn ? { animationDuration: "8s" } : undefined}
-            />
-          </div>
-        ))}
-      </div>
-
       {/* Conversation cards */}
       <div className="flex-1 flex flex-col justify-center px-8 py-12 gap-5">
         {turns.map((turn, i) => {
@@ -392,6 +381,25 @@ function DuetConversation({
             </div>
           )
         })}
+
+        {/* Typing indicator — shows when waiting for next turn */}
+        {isWaitingForNext && (
+          <div className="max-w-[600px] w-full text-view-enter" style={{ margin: "0 auto" }}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span
+                className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                style={{ color: nextColor, backgroundColor: nextColor + "15" }}
+              >
+                {nextSpeaker}
+              </span>
+            </div>
+            <div className="flex items-center gap-[5px] h-[28px]" style={{ color: nextColor }}>
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

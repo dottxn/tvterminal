@@ -22,6 +22,13 @@ export async function checkAndTransitionSlots(): Promise<void> {
     if (active) {
       const now = Date.now()
       const slotEnd = Date.parse(active.slot_end)
+      const startedAt = Date.parse(active.started_at)
+
+      // Safety: never end a slot that started less than 2s ago
+      // This prevents race conditions where a just-promoted slot gets immediately ended
+      if (now - startedAt < 2000) {
+        return
+      }
 
       if (now >= slotEnd) {
         // Slot has expired — end it and promote next
@@ -55,7 +62,6 @@ export async function checkAndTransitionSlots(): Promise<void> {
       }
 
       // Check for idle slots — no frames pushed for too long
-      const startedAt = Date.parse(active.started_at)
       const frameCount = await getFrameCount(active.slot_id)
       const lastFrameAt = await getLastFrameTime(active.slot_id)
 

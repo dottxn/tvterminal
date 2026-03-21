@@ -19,8 +19,9 @@ function getRedis(): Redis {
 // Prevents concurrent checkAndTransitionSlots from racing
 
 export async function acquireTransitionLock(): Promise<boolean> {
-  // SET NX with 5s TTL — only one caller wins
-  const result = await getRedis().set("tvt:transition_lock", "1", { nx: true, ex: 5 })
+  // SET NX with 15s TTL — only one caller wins
+  // Needs to be long enough for the full promote cycle (multiple Redis + Ably calls)
+  const result = await getRedis().set("tvt:transition_lock", "1", { nx: true, ex: 15 })
   return result === "OK"
 }
 

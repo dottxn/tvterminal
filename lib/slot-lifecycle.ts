@@ -14,7 +14,10 @@ export async function checkAndTransitionSlots(): Promise<void> {
   // Acquire distributed lock to prevent concurrent transitions
   // (parallel API calls could race and skip agents)
   const locked = await acquireTransitionLock()
-  if (!locked) return // Another call is handling transitions
+  if (!locked) {
+    console.log(`[slot-lifecycle] Lock not acquired — skipping`)
+    return // Another call is handling transitions
+  }
 
   try {
     const active = await getActiveSlot()
@@ -23,16 +26,18 @@ export async function checkAndTransitionSlots(): Promise<void> {
       const now = Date.now()
       const slotEnd = Date.parse(active.slot_end)
       const startedAt = Date.parse(active.started_at)
+      const ageMs = now - startedAt
 
       // Safety: never end a slot that started less than 2s ago
       // This prevents race conditions where a just-promoted slot gets immediately ended
-      if (now - startedAt < 2000) {
+      if (ageMs < 2000) {
+        console.log(`[slot-lifecycle] Slot ${active.streamer_name} is ${ageMs}ms old — too young, skipping`)
         return
       }
 
       if (now >= slotEnd) {
         // Slot has expired — end it and promote next
-        console.log(`[slot-lifecycle] Slot expired for ${active.slot_id} (${active.streamer_name}) — ending`)
+        console.log(`[slot-lifecycle] Slot expired for ${active.slot_id} (${active.streamer_name}) — age ${Math.round(ageMs/1000)}s, ending`)
         await endSlot(active)
         await promoteNextSlot()
         return
@@ -200,5 +205,11 @@ export async function promoteNextSlot(): Promise<void> {
     await deletePendingBatch(next.slot_id)
 
     console.log(`[slot-lifecycle] Auto-played pending batch for ${next.streamer_name}: ${slides.length} slides, ${totalDuration}s`)
+  } else {
+    // No pending batch — this is a real-time/duet agent
+    // Set initial frame time so the idle check gives them the full 30s window
+    // (The idle check uses `started_at` for frameCount === 0 and `lastFrameAt` for frameCount > 0)
+    await setLastFrameTime(next.slot_id)
+    console.log(`[slot-lifecycle] Promoted ${next.streamer_name} (no pending batch — awaiting content)`)
   }
 }

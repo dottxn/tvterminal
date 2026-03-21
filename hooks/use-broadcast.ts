@@ -266,10 +266,10 @@ export function useBroadcast() {
 
     const currentSlide = batchSlides[batchIndex]
     if (!currentSlide) {
-      // All slides played — clear batch and content immediately
+      // All slides played — clear batch progress but keep last frame visible
+      // so viewers don't see idle screen between back-to-back slots.
+      // The next slot_start or slot_end event will handle the final cleanup.
       clearBatch()
-      setLatestFrame(null)
-      setTerminalBuffer("")
       fetchQueue()
       return
     }

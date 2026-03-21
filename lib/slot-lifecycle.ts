@@ -1,4 +1,4 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getDuetState, clearDuetState, getPendingBatch, deletePendingBatch } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getDuetState, clearDuetState, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot, ValidatedSlide } from "./types"
 
@@ -11,66 +11,78 @@ const IDLE_TIMEOUT_MS = 30_000
  * Called by every API route (check-on-access) and the cron job.
  */
 export async function checkAndTransitionSlots(): Promise<void> {
-  const active = await getActiveSlot()
+  // Acquire distributed lock to prevent concurrent transitions
+  // (parallel API calls could race and skip agents)
+  const locked = await acquireTransitionLock()
+  if (!locked) return // Another call is handling transitions
 
-  if (active) {
-    const now = Date.now()
-    const slotEnd = Date.parse(active.slot_end)
+  try {
+    const active = await getActiveSlot()
 
-    if (now >= slotEnd) {
-      // Slot has expired — end it and promote next
-      await endSlot(active)
-      await promoteNextSlot()
-      return
-    }
+    if (active) {
+      const now = Date.now()
+      const slotEnd = Date.parse(active.slot_end)
 
-    // Check if a batch finished playing
-    const batchEndAt = await getBatchMode(active.slot_id)
-    if (batchEndAt) {
-      const batchEnd = Date.parse(batchEndAt)
-      if (now >= batchEnd + 3000) {
-        // Batch complete + 3s buffer — end slot
-        console.log(`[slot-lifecycle] Batch complete for ${active.slot_id} (${active.streamer_name}) — ending slot`)
+      if (now >= slotEnd) {
+        // Slot has expired — end it and promote next
+        console.log(`[slot-lifecycle] Slot expired for ${active.slot_id} (${active.streamer_name}) — ending`)
         await endSlot(active)
         await promoteNextSlot()
         return
       }
-      // Batch still playing — skip idle check
-      if (now < batchEnd) {
+
+      // Check if a batch finished playing
+      const batchEndAt = await getBatchMode(active.slot_id)
+      if (batchEndAt) {
+        const batchEnd = Date.parse(batchEndAt)
+        if (now >= batchEnd + 3000) {
+          // Batch complete + 3s buffer — end slot
+          console.log(`[slot-lifecycle] Batch complete for ${active.slot_id} (${active.streamer_name}) — ending slot`)
+          await endSlot(active)
+          await promoteNextSlot()
+          return
+        }
+        // Batch still playing — skip idle check
+        if (now < batchEnd) {
+          return
+        }
+      }
+
+      // Skip idle check during active duet (conversation is self-timed)
+      const duetActive = await getDuetState(active.slot_id)
+      if (duetActive) {
         return
       }
-    }
 
-    // Skip idle check during active duet (conversation is self-timed)
-    const duetActive = await getDuetState(active.slot_id)
-    if (duetActive) {
-      return
-    }
+      // Check for idle slots — no frames pushed for too long
+      const startedAt = Date.parse(active.started_at)
+      const frameCount = await getFrameCount(active.slot_id)
+      const lastFrameAt = await getLastFrameTime(active.slot_id)
 
-    // Check for idle slots — no frames pushed for too long
-    const startedAt = Date.parse(active.started_at)
-    const frameCount = await getFrameCount(active.slot_id)
-    const lastFrameAt = await getLastFrameTime(active.slot_id)
-
-    if (frameCount === 0 && now - startedAt > IDLE_TIMEOUT_MS) {
-      // Never pushed a single frame — cut them off
-      console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames after ${Math.round((now - startedAt) / 1000)}s`)
-      await endSlot(active)
-      await promoteNextSlot()
-    } else if (lastFrameAt && now - lastFrameAt > IDLE_TIMEOUT_MS) {
-      // Stopped pushing frames — cut them off
-      console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames for ${Math.round((now - lastFrameAt) / 1000)}s`)
-      await endSlot(active)
+      if (frameCount === 0 && now - startedAt > IDLE_TIMEOUT_MS) {
+        // Never pushed a single frame — cut them off
+        console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames after ${Math.round((now - startedAt) / 1000)}s`)
+        await endSlot(active)
+        await promoteNextSlot()
+      } else if (lastFrameAt && now - lastFrameAt > IDLE_TIMEOUT_MS) {
+        // Stopped pushing frames — cut them off
+        console.log(`[slot-lifecycle] Cutting idle slot ${active.slot_id} (${active.streamer_name}) — no frames for ${Math.round((now - lastFrameAt) / 1000)}s`)
+        await endSlot(active)
+        await promoteNextSlot()
+      }
+    } else {
+      // No active slot — check if there's something in the queue
       await promoteNextSlot()
     }
-  } else {
-    // No active slot — check if there's something in the queue
-    await promoteNextSlot()
+  } finally {
+    await releaseTransitionLock()
   }
 }
 
 /**
- * End the current active slot — publish slot_end, clear KV, update meta.
+ * End the current active slot — publish slot_end, clean up KV, update meta.
+ * Does NOT clear the active slot — that's done by promoteNextSlot (which
+ * replaces it atomically) or by the caller if no next slot exists.
  */
 export async function endSlot(slot: ActiveSlot): Promise<void> {
   // Clean up duet if active
@@ -96,8 +108,6 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
     meta.status = "completed"
     await setSlotMeta(slot.slot_id, meta)
   }
-
-  await clearActiveSlot()
 }
 
 /**
@@ -106,7 +116,11 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
  */
 export async function promoteNextSlot(): Promise<void> {
   const next = await popFromQueue()
-  if (!next) return
+  if (!next) {
+    // No next agent — clear active slot
+    await clearActiveSlot()
+    return
+  }
 
   const now = new Date()
   const slotEnd = new Date(now.getTime() + next.duration_minutes * 60 * 1000)

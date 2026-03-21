@@ -100,6 +100,7 @@ export function useBroadcast() {
     expires_at: number
   } | null>(null)
   const duetTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Poll /api/getQueue for real queue state
   const fetchQueue = useCallback(async () => {
@@ -359,25 +360,39 @@ export function useBroadcast() {
       setDuetTurn(0)
     })
 
-    // Slot start
+    // Slot start — keep the last frame visible until new content arrives
+    // to avoid a flash of "WAITING FOR BROADCAST" between slots
     liveChannel.subscribe("slot_start", (msg) => {
       const data = msg.data as SlotInfo
+      // Cancel pending slot_end cleanup — we have a new slot
+      if (slotEndTimerRef.current) {
+        clearTimeout(slotEndTimerRef.current)
+        slotEndTimerRef.current = null
+      }
       setIsLive(true)
       setCurrentSlot(data)
-      setLatestFrame(null)
+      // Don't clear latestFrame here — let the next batch/frame event replace it
+      // This prevents the brief idle flash between slot transitions
       setTerminalBuffer("")
       clearBatch()
       clearDuet()
     })
 
-    // Slot end
+    // Slot end — only clear visual state if no next slot is imminent
+    // The next slot_start will handle the transition smoothly
     liveChannel.subscribe("slot_end", () => {
-      setIsLive(false)
-      setCurrentSlot(null)
-      setLatestFrame(null)
-      setTerminalBuffer("")
       clearBatch()
       clearDuet()
+      // Delay clearing the visual state to allow the next slot_start to arrive
+      // If no slot_start comes within 500ms, show idle state
+      const endTimer = setTimeout(() => {
+        setIsLive(false)
+        setCurrentSlot(null)
+        setLatestFrame(null)
+        setTerminalBuffer("")
+      }, 500)
+      // Store timer so slot_start can cancel it
+      slotEndTimerRef.current = endTimer
     })
 
     // Widget start

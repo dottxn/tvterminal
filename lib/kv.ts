@@ -15,6 +15,19 @@ function getRedis(): Redis {
   return redis
 }
 
+// ── Distributed Lock ──
+// Prevents concurrent checkAndTransitionSlots from racing
+
+export async function acquireTransitionLock(): Promise<boolean> {
+  // SET NX with 5s TTL — only one caller wins
+  const result = await getRedis().set("tvt:transition_lock", "1", { nx: true, ex: 5 })
+  return result === "OK"
+}
+
+export async function releaseTransitionLock(): Promise<void> {
+  await getRedis().del("tvt:transition_lock")
+}
+
 // ── Active Slot ──
 
 export async function getActiveSlot(): Promise<ActiveSlot | null> {

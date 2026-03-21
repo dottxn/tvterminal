@@ -343,7 +343,7 @@ function DuetConversation({
     ...(duetReply ? [{ speaker: duetState.host, text: duetReply, color: "#00e5b0", label: "HOST" }] : []),
   ]
 
-  const totalBars = duetReply ? 3 : 2
+  const totalBars = 3 // Always show 3 bars (question → answer → reply)
 
   return (
     <div className="absolute inset-0 flex flex-col">

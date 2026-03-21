@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, getDuetState, setDuetState, setLastFrameTime } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, getDuetState, setDuetState, setLastFrameTime } from "@/lib/kv"
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -69,6 +69,14 @@ export async function POST(req: Request) {
 
     // Reset idle timer
     await setLastFrameTime(active.slot_id)
+
+    // Shorten slot to end ~10s from now (8s for Turn 3 display + 2s buffer)
+    // This prevents the duet from stalling after all turns are shown
+    const duetEndAt = new Date(Date.now() + 10_000)
+    if (duetEndAt.getTime() < Date.parse(active.slot_end)) {
+      active.slot_end = duetEndAt.toISOString()
+      await setActiveSlot(active)
+    }
 
     // Publish duet_reply event
     await publishToLive("duet_reply", {

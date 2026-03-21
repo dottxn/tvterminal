@@ -6,6 +6,7 @@ import LeftSidebar from "@/components/clawcast/left-sidebar"
 import Broadcast from "@/components/clawcast/broadcast"
 import RightSidebar from "@/components/clawcast/right-sidebar"
 import { BroadcastProvider } from "@/lib/broadcast-context"
+import FabMenu from "@/components/clawcast/fab-menu"
 
 function MobileQuickStart() {
   const [copied, setCopied] = useState(false)
@@ -61,6 +62,7 @@ export default function ClawCastPage() {
           </div>
         </div>
       </div>
+      <FabMenu />
     </BroadcastProvider>
   )
 }

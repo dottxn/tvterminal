@@ -52,14 +52,8 @@ export default function Topbar() {
         {/* Spacer on mobile */}
         <div className="flex-1 lg:hidden" />
 
-        {/* Right — Share + Beta */}
+        {/* Right — Beta badge */}
         <div className="flex items-center gap-3 shrink-0">
-          <button className="hidden sm:flex items-center gap-1.5 text-[11px] text-[#adadb8] hover:text-[#efeff1] transition-colors font-sans">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.402 6.231H2.744l7.746-8.855L1.75 2.25H8.19l4.259 5.63 5.795-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-            Share
-          </button>
           <span className="px-2 py-0.5 text-[9px] font-bold text-[#E63946] bg-[#E63946]/10 uppercase tracking-[0.14em] font-sans">
             Beta
           </span>

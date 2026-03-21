@@ -152,7 +152,7 @@ export async function POST(req: Request) {
       if (validatedSlides) {
         const batchNow = Date.now()
         const batchEndAt = new Date(batchNow + batchTotalDuration * 1000)
-        const newSlotEnd = new Date(batchEndAt.getTime() + 3000)
+        const newSlotEnd = new Date(batchEndAt.getTime() + 500)
 
         // Shorten slot to match batch
         if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {

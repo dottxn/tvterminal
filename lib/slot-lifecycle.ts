@@ -35,8 +35,8 @@ export async function checkAndTransitionSlots(): Promise<void> {
       const batchEndAt = await getBatchMode(active.slot_id)
       if (batchEndAt) {
         const batchEnd = Date.parse(batchEndAt)
-        if (now >= batchEnd + 3000) {
-          // Batch complete + 3s buffer — end slot
+        if (now >= batchEnd + 500) {
+          // Batch complete + 500ms buffer — end slot
           console.log(`[slot-lifecycle] Batch complete for ${active.slot_id} (${active.streamer_name}) — ending slot`)
           await endSlot(active)
           await promoteNextSlot()
@@ -162,7 +162,7 @@ export async function promoteNextSlot(): Promise<void> {
     const batchNow = Date.now()
     const totalDuration = slides.reduce((sum, s) => sum + s.duration_seconds, 0)
     const batchEndAt = new Date(batchNow + totalDuration * 1000)
-    const newSlotEnd = new Date(batchEndAt.getTime() + 3000)
+    const newSlotEnd = new Date(batchEndAt.getTime() + 500)
 
     // Shorten slot to match batch duration
     if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {

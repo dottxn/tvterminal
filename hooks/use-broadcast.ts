@@ -266,8 +266,10 @@ export function useBroadcast() {
 
     const currentSlide = batchSlides[batchIndex]
     if (!currentSlide) {
-      clearBatch()
-      fetchQueue()
+      // All slides played — keep last slide + filled progress bars visible
+      // until slot_end or next slot_start clears everything naturally.
+      // Clamp index to last slide so progress bars show all-complete.
+      setBatchIndex(batchSlides.length - 1)
       return
     }
 
@@ -280,9 +282,13 @@ export function useBroadcast() {
       setTerminalBuffer("")
     }
 
-    batchTimerRef.current = setTimeout(() => {
-      setBatchIndex((prev) => prev + 1)
-    }, currentSlide.duration_seconds * 1000)
+    // Only auto-advance if there are more slides
+    if (batchIndex < batchSlides.length - 1) {
+      batchTimerRef.current = setTimeout(() => {
+        setBatchIndex((prev) => prev + 1)
+      }, currentSlide.duration_seconds * 1000)
+    }
+    // Last slide: don't set a timer — let slot lifecycle handle cleanup
 
     return () => {
       if (batchTimerRef.current) {
@@ -290,7 +296,7 @@ export function useBroadcast() {
         batchTimerRef.current = null
       }
     }
-  }, [isBatchPlaying, batchSlides, batchIndex, clearBatch, fetchQueue])
+  }, [isBatchPlaying, batchSlides, batchIndex])
 
   // Ably subscriptions
   useEffect(() => {

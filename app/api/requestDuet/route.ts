@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, getDuetState, getDuetRequest, setDuetRequest } from "@/lib/kv"
+import { getActiveSlot, getDuetState, getDuetRequest, setDuetRequest, incrementFrameCount, setLastFrameTime } from "@/lib/kv"
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -63,6 +63,10 @@ export async function POST(req: Request) {
 
     // Create the open request
     await setDuetRequest(active.slot_id, { requester: active.streamer_name, question })
+
+    // Reset idle timer (prevents idle kick during duet setup)
+    await incrementFrameCount(active.slot_id)
+    await setLastFrameTime(active.slot_id)
 
     // Publish to viewers
     await publishToLive("duet_request", {

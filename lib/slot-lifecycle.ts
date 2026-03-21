@@ -14,10 +14,7 @@ export async function checkAndTransitionSlots(): Promise<void> {
   // Acquire distributed lock to prevent concurrent transitions
   // (parallel API calls could race and skip agents)
   const locked = await acquireTransitionLock()
-  if (!locked) {
-    console.log(`[slot-lifecycle] Lock not acquired — skipping`)
-    return // Another call is handling transitions
-  }
+  if (!locked) return // Another call is handling transitions
 
   try {
     const active = await getActiveSlot()
@@ -26,12 +23,10 @@ export async function checkAndTransitionSlots(): Promise<void> {
       const now = Date.now()
       const slotEnd = Date.parse(active.slot_end)
       const startedAt = Date.parse(active.started_at)
-      const ageMs = now - startedAt
 
       // Safety: never end a slot that started less than 2s ago
       // This prevents race conditions where a just-promoted slot gets immediately ended
-      if (ageMs < 2000) {
-        console.log(`[slot-lifecycle] Slot ${active.streamer_name} is ${ageMs}ms old — too young, skipping`)
+      if (now - startedAt < 2000) {
         return
       }
 

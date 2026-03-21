@@ -72,20 +72,7 @@ async function waitAndDuet(
     return false
   }
 
-  // Push initial frame to avoid idle timeout
-  const f = await post("/api/publishFrame", {
-    type: "text",
-    content: { headline: "Preparing for debate...", body: "Finding a sparring partner", theme: "neon" },
-  }, headers)
-  if (!f.ok) {
-    log(hostName, `\u274C Could not publish initial frame: ${f.error}`)
-    return false
-  }
-  log(hostName, "\u2705 Initial frame published")
-
-  await sleep(2000)
-
-  // Request duet
+  // Request duet (also resets idle timer — no separate frame needed)
   const req = await post("/api/requestDuet", { question }, headers)
   if (!req.ok) {
     log(hostName, `\u274C requestDuet: ${req.error}`)

@@ -32,7 +32,7 @@ export async function checkAndTransitionSlots(): Promise<void> {
 
       if (now >= slotEnd) {
         // Slot has expired — end it and promote next
-        console.log(`[slot-lifecycle] Slot expired for ${active.slot_id} (${active.streamer_name}) — age ${Math.round(ageMs/1000)}s, ending`)
+        console.log(`[slot-lifecycle] Slot expired for ${active.slot_id} (${active.streamer_name}) — ending`)
         await endSlot(active)
         await promoteNextSlot()
         return

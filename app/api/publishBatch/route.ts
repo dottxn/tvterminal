@@ -3,9 +3,7 @@ import { getActiveSlot, setActiveSlot, incrementFrameCount, setLastFrameType, se
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { DEFAULT_SLIDE_DURATION, MAX_SLIDES, MAX_SLIDE_DURATION, MIN_SLIDE_DURATION } from "@/lib/types"
-
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget"])
+import { validateSlides } from "@/lib/types"
 
 export async function OPTIONS() {
   return optionsResponse()
@@ -60,33 +58,16 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { slides } = body as { slides?: unknown[] }
 
-    if (!slides || !Array.isArray(slides) || slides.length === 0) {
-      return jsonResponse({ ok: false, error: "slides array required (1-10 items)" }, 400)
-    }
-    if (slides.length > MAX_SLIDES) {
-      return jsonResponse({ ok: false, error: `Maximum ${MAX_SLIDES} slides allowed` }, 400)
+    if (!slides) {
+      return jsonResponse({ ok: false, error: "slides array required" }, 400)
     }
 
-    // Validate each slide and compute durations
-    const validatedSlides: Array<{ type: string; content: Record<string, unknown>; duration_seconds: number }> = []
-    let totalDuration = 0
-
-    for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i] as { type?: string; content?: Record<string, unknown>; duration_seconds?: number }
-
-      if (!slide.type || !VALID_FRAME_TYPES.has(slide.type)) {
-        return jsonResponse({ ok: false, error: `Slide ${i}: type must be one of: ${[...VALID_FRAME_TYPES].join(", ")}` }, 400)
-      }
-      if (!slide.content || typeof slide.content !== "object") {
-        return jsonResponse({ ok: false, error: `Slide ${i}: content object required` }, 400)
-      }
-
-      const defaultDuration = DEFAULT_SLIDE_DURATION[slide.type] ?? 8
-      const duration = Math.min(MAX_SLIDE_DURATION, Math.max(MIN_SLIDE_DURATION, Math.round(slide.duration_seconds ?? defaultDuration)))
-
-      validatedSlides.push({ type: slide.type, content: slide.content, duration_seconds: duration })
-      totalDuration += duration
+    const result = validateSlides(slides)
+    if ("error" in result) {
+      return jsonResponse({ ok: false, error: result.error }, 400)
     }
+
+    const { slides: validatedSlides, totalDuration } = result
 
     // Shorten the slot to match batch duration + 3s buffer
     const now = Date.now()

@@ -1,6 +1,6 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, getDuetState, clearDuetState } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getDuetState, clearDuetState, getPendingBatch, deletePendingBatch } from "./kv"
 import { publishToLive } from "./ably-server"
-import type { ActiveSlot } from "./types"
+import type { ActiveSlot, ValidatedSlide } from "./types"
 
 // Cut off agents who book a slot but don't broadcast anything
 // 30s gives queued agents enough time to discover they've been promoted
@@ -102,6 +102,7 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
 
 /**
  * Promote the next queued slot to active.
+ * If the slot has a pending batch (slides submitted at booking), auto-play it.
  */
 export async function promoteNextSlot(): Promise<void> {
   const next = await popFromQueue()
@@ -128,15 +129,56 @@ export async function promoteNextSlot(): Promise<void> {
     await setSlotMeta(next.slot_id, meta)
   }
 
-  // Publish slot_start — matches what use-broadcast.ts expects
+  // Publish slot_start
   try {
     await publishToLive("slot_start", {
       streamer_name: active.streamer_name,
       streamer_url: active.streamer_url,
       slot_end: active.slot_end,
-      type: "terminal", // default, updated as frames come in
+      type: "terminal",
     })
   } catch (err) {
     console.error("[slot-lifecycle] Failed to publish slot_start:", err)
+  }
+
+  // Check for pending batch (slides submitted at booking time)
+  const pendingSlides = await getPendingBatch(next.slot_id)
+  if (pendingSlides && Array.isArray(pendingSlides) && pendingSlides.length > 0) {
+    const slides = pendingSlides as ValidatedSlide[]
+    const batchNow = Date.now()
+    const totalDuration = slides.reduce((sum, s) => sum + s.duration_seconds, 0)
+    const batchEndAt = new Date(batchNow + totalDuration * 1000)
+    const newSlotEnd = new Date(batchEndAt.getTime() + 3000)
+
+    // Shorten slot to match batch duration
+    if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {
+      active.slot_end = newSlotEnd.toISOString()
+      await setActiveSlot(active)
+    }
+
+    // Set batch mode
+    await setBatchMode(next.slot_id, batchEndAt.toISOString())
+    await setBatchSlides(next.slot_id, slides, batchNow)
+
+    // Track frame activity (prevents idle timeout)
+    await incrementFrameCount(next.slot_id)
+    await setLastFrameType(next.slot_id, slides[0].type)
+    await setLastFrameTime(next.slot_id)
+
+    // Publish batch event to Ably
+    try {
+      await publishToLive("batch", {
+        slides,
+        total_duration_seconds: totalDuration,
+        slide_count: slides.length,
+      })
+    } catch (err) {
+      console.error("[slot-lifecycle] Failed to publish pending batch:", err)
+    }
+
+    // Clean up pending batch
+    await deletePendingBatch(next.slot_id)
+
+    console.log(`[slot-lifecycle] Auto-played pending batch for ${next.streamer_name}: ${slides.length} slides, ${totalDuration}s`)
   }
 }

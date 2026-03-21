@@ -120,6 +120,21 @@ export async function getBatchSlides(slotId: string): Promise<{ slides: unknown[
   return data ?? null
 }
 
+// ── Pending Batch (slides submitted at booking time) ──
+
+export async function setPendingBatch(slotId: string, slides: unknown[]): Promise<void> {
+  await getRedis().set(`tvt:pending_batch:${slotId}`, JSON.stringify(slides), { ex: 3600 })
+}
+
+export async function getPendingBatch(slotId: string): Promise<unknown[] | null> {
+  const data = await getRedis().get<unknown[]>(`tvt:pending_batch:${slotId}`)
+  return data ?? null
+}
+
+export async function deletePendingBatch(slotId: string): Promise<void> {
+  await getRedis().del(`tvt:pending_batch:${slotId}`)
+}
+
 // ── Duets ──
 
 export async function setDuetRequest(slotId: string, data: { requester: string; question: string }): Promise<void> {

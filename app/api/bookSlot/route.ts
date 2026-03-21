@@ -1,10 +1,11 @@
 import { randomBytes } from "crypto"
 import { signSlotJWT } from "@/lib/jwt"
-import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime } from "@/lib/kv"
 import { publishToLive } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import type { ActiveSlot, QueuedSlot, SlotMeta } from "@/lib/types"
+import { validateSlides } from "@/lib/types"
+import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
 export async function OPTIONS() {
   return optionsResponse()
@@ -22,10 +23,11 @@ export async function POST(req: Request) {
 
     // Parse + validate
     const body = await req.json()
-    const { streamer_name, streamer_url, duration_minutes } = body as {
+    const { streamer_name, streamer_url, duration_minutes, slides } = body as {
       streamer_name?: string
       streamer_url?: string
       duration_minutes?: number
+      slides?: unknown[]
     }
 
     if (!streamer_name || typeof streamer_name !== "string" || !/^[\w.-]{1,50}$/.test(streamer_name)) {
@@ -44,6 +46,19 @@ export async function POST(req: Request) {
 
     const duration = Math.min(3, Math.max(1, Math.round(duration_minutes ?? 1)))
 
+    // Validate slides if provided (book-with-content)
+    let validatedSlides: ValidatedSlide[] | null = null
+    let batchTotalDuration = 0
+
+    if (slides && Array.isArray(slides) && slides.length > 0) {
+      const result = validateSlides(slides)
+      if ("error" in result) {
+        return jsonResponse({ ok: false, error: result.error }, 400)
+      }
+      validatedSlides = result.slides
+      batchTotalDuration = result.totalDuration
+    }
+
     // Ensure state is current
     await checkAndTransitionSlots()
 
@@ -59,18 +74,15 @@ export async function POST(req: Request) {
     let isImmediate = false
 
     if (!activeSlot && queue.length === 0) {
-      // Queue empty — start immediately
       scheduledStart = now
       isImmediate = true
     } else if (activeSlot) {
-      // Someone is live — schedule after them + queued items
       let endTime = Date.parse(activeSlot.slot_end)
       for (const q of queue) {
         endTime += q.duration_minutes * 60 * 1000
       }
       scheduledStart = new Date(endTime)
     } else {
-      // No active but queue exists (edge case) — schedule after queue
       let endTime = now.getTime()
       for (const q of queue) {
         endTime += q.duration_minutes * 60 * 1000
@@ -101,6 +113,18 @@ export async function POST(req: Request) {
     }
     await setSlotMeta(slotId, meta)
 
+    // Build response
+    const response: Record<string, unknown> = {
+      ok: true,
+      slot_jwt: jwt,
+      streamer_name,
+      position_in_queue: isImmediate ? 0 : queue.length + 1,
+      scheduled_start: scheduledStart.toISOString(),
+      slot_end: slotEnd.toISOString(),
+      duration_minutes: duration,
+      free: true,
+    }
+
     if (isImmediate) {
       // Start broadcasting now
       const active: ActiveSlot = {
@@ -123,6 +147,37 @@ export async function POST(req: Request) {
       } catch (err) {
         console.error("[bookSlot] Failed to publish slot_start:", err)
       }
+
+      // If slides provided, auto-play batch immediately
+      if (validatedSlides) {
+        const batchNow = Date.now()
+        const batchEndAt = new Date(batchNow + batchTotalDuration * 1000)
+        const newSlotEnd = new Date(batchEndAt.getTime() + 3000)
+
+        // Shorten slot to match batch
+        if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {
+          active.slot_end = newSlotEnd.toISOString()
+          await setActiveSlot(active)
+        }
+
+        await setBatchMode(slotId, batchEndAt.toISOString())
+        await setBatchSlides(slotId, validatedSlides, batchNow)
+        await incrementFrameCount(slotId)
+        await setLastFrameType(slotId, validatedSlides[0].type)
+        await setLastFrameTime(slotId)
+
+        await publishToLive("batch", {
+          slides: validatedSlides,
+          total_duration_seconds: batchTotalDuration,
+          slide_count: validatedSlides.length,
+        })
+
+        response.batch_queued = true
+        response.slide_count = validatedSlides.length
+        response.total_duration_seconds = batchTotalDuration
+        response.batch_ends_at = batchEndAt.toISOString()
+        response.slot_end = active.slot_end
+      }
     } else {
       // Queue it
       const queued: QueuedSlot = {
@@ -134,18 +189,17 @@ export async function POST(req: Request) {
         queued_at: now.toISOString(),
       }
       await pushToQueue(queued)
+
+      // If slides provided, store as pending batch for auto-play on promotion
+      if (validatedSlides) {
+        await setPendingBatch(slotId, validatedSlides)
+        response.batch_queued = true
+        response.slide_count = validatedSlides.length
+        response.total_duration_seconds = batchTotalDuration
+      }
     }
 
-    return jsonResponse({
-      ok: true,
-      slot_jwt: jwt,
-      streamer_name,
-      position_in_queue: isImmediate ? 0 : queue.length + 1,
-      scheduled_start: scheduledStart.toISOString(),
-      slot_end: slotEnd.toISOString(),
-      duration_minutes: duration,
-      free: true,
-    })
+    return jsonResponse(response)
   } catch (err) {
     console.error("[bookSlot]", err)
     return jsonResponse(

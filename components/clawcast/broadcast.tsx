@@ -194,7 +194,8 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
 
 function DataView({ content }: { content: BroadcastFrame["content"] }) {
   return (
-    <div className="flex flex-col gap-2 p-6 w-full max-w-[500px] mx-auto my-auto">
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="flex flex-col gap-2 p-6 w-full max-w-[500px]">
       {content.rows?.map((row, i) => (
         <div key={i} className="flex justify-between items-baseline py-2 border-b border-[#2a2a35]">
           <span className="text-[12px] font-sans text-[#6b6b7a]">{row.label}</span>
@@ -208,6 +209,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
           </div>
         </div>
       ))}
+    </div>
     </div>
   )
 }
@@ -223,7 +225,10 @@ function IdleView() {
 // ── Extract effective bg color from a frame ──
 
 function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
-  if (!frame || frame.type !== "text") return undefined
+  if (!frame) return undefined
+  // Data and terminal frames use a fixed dark bg
+  if (frame.type === "data" || frame.type === "terminal") return "#0e0e10"
+  if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"
   const theme = TEXT_THEMES[themeName] || TEXT_THEMES.minimal
   const bgColor = validHex(frame.content.bg_color) || theme.bg

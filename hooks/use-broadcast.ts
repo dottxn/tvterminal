@@ -239,7 +239,7 @@ export function useBroadcast() {
     const nextSlide = batchSlides[batchIndex + 1]
     const isCurrentDuet = currentSlide.type === "duet"
     const isNextDuet = nextSlide?.type === "duet"
-    const TYPING_DURATION = 2000 // 2s typing indicator
+    const TYPING_DURATION = 1200 // 1.2s typing indicator
 
     if (isCurrentDuet && isNextDuet) {
       // Show typing indicator 2s before the slide ends, then advance

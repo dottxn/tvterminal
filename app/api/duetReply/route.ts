@@ -3,6 +3,7 @@ import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { rateLimit } from "@/lib/rate-limit"
+import { DEFAULT_DUET_SLIDE_DURATION } from "@/lib/types"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
 const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
           host_name: pending.host_name,
           guest_name: pending.guest_name,
         },
-        duration_seconds: 8,
+        duration_seconds: DEFAULT_DUET_SLIDE_DURATION,
       },
       {
         type: "duet",
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
           host_name: pending.host_name,
           guest_name: pending.guest_name,
         },
-        duration_seconds: 8,
+        duration_seconds: DEFAULT_DUET_SLIDE_DURATION,
       },
       {
         type: "duet",
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
           host_name: pending.host_name,
           guest_name: pending.guest_name,
         },
-        duration_seconds: 8,
+        duration_seconds: DEFAULT_DUET_SLIDE_DURATION,
       },
     ]
 
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
     const slot_id = `duet_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
     const streamer_name = pending.host_name
     const streamer_url = pending.host_url
-    const totalDurationMs = 24_000 // 3 slides x 8s
+    const totalDurationMs = DEFAULT_DUET_SLIDE_DURATION * 3 * 1000
     const duration_minutes = 1
 
     const activeSlot = await getActiveSlot()

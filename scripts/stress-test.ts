@@ -99,39 +99,39 @@ async function runDuet(
 
 const agentSlides: Record<string, unknown[]> = {
   data_nerd: [
-    { type: "data", content: { rows: [{ label: "npm installs today", value: "2.1B", change: "+3.2%" }, { label: "Stack Overflow copies", value: "847M", change: "+12%" }, { label: "It works on my machine", value: "∞", change: "—" }] }, duration_seconds: 7 },
-    { type: "text", content: { headline: "📊 Fun Fact", body: "The average developer copies 14 Stack Overflow answers before writing original code.", theme: "matrix" }, duration_seconds: 7 },
-    { type: "data", content: { rows: [{ label: "Tabs vs Spaces", value: "50/50", change: "eternal war" }, { label: "Light mode users", value: "12%", change: "-2%" }, { label: "Vim exiters", value: "23%", change: "stuck" }] }, duration_seconds: 6 },
+    { type: "data", content: { rows: [{ label: "npm installs today", value: "2.1B", change: "+3.2%" }, { label: "Stack Overflow copies", value: "847M", change: "+12%" }, { label: "It works on my machine", value: "∞", change: "—" }] }, duration_seconds: 5 },
+    { type: "text", content: { headline: "📊 Fun Fact", body: "The average developer copies 14 Stack Overflow answers before writing original code.", theme: "matrix" }, duration_seconds: 5 },
+    { type: "data", content: { rows: [{ label: "Tabs vs Spaces", value: "50/50", change: "eternal war" }, { label: "Light mode users", value: "12%", change: "-2%" }, { label: "Vim exiters", value: "23%", change: "stuck" }] }, duration_seconds: 4 },
   ],
   hot_takes: [
-    { type: "text", content: { headline: "HOT TAKE #1", body: "Tabs are objectively better than spaces. Fight me.", theme: "bold", gif_url: "https://media.giphy.com/media/l0MYGb1LuZ3n7dRnO/giphy.gif" }, duration_seconds: 6 },
-    { type: "text", content: { headline: "HOT TAKE #2", body: "Most microservices should have stayed monoliths. Your startup does not need Kubernetes.", theme: "bold" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "HOT TAKE #3", body: "AI will not replace developers. But developers using AI will replace developers not using AI.", theme: "neon" }, duration_seconds: 7 },
+    { type: "text", content: { headline: "HOT TAKE #1", body: "Tabs are objectively better than spaces. Fight me.", theme: "bold", gif_url: "https://media.giphy.com/media/l0MYGb1LuZ3n7dRnO/giphy.gif" }, duration_seconds: 4 },
+    { type: "text", content: { headline: "HOT TAKE #2", body: "Most microservices should have stayed monoliths. Your startup does not need Kubernetes.", theme: "bold" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "HOT TAKE #3", body: "AI will not replace developers. But developers using AI will replace developers not using AI.", theme: "neon" }, duration_seconds: 5 },
   ],
   fortune_teller: [
-    { type: "text", content: { headline: "🔮 Your Fortune", body: "You will mass-adopt a framework you swore you would never use. It starts with R and ends with ust.", theme: "warm" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "🌟 Career Oracle", body: "A pull request you approved at 2am will haunt you for exactly 3 sprints.", theme: "neon", gif_url: "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "💫 Love Life", body: "You and your IDE will finally reach an understanding. It involves 47 custom keybindings.", theme: "minimal" }, duration_seconds: 7 },
+    { type: "text", content: { headline: "🔮 Your Fortune", body: "You will mass-adopt a framework you swore you would never use. It starts with R and ends with ust.", theme: "warm" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "🌟 Career Oracle", body: "A pull request you approved at 2am will haunt you for exactly 3 sprints.", theme: "neon", gif_url: "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "💫 Love Life", body: "You and your IDE will finally reach an understanding. It involves 47 custom keybindings.", theme: "minimal" }, duration_seconds: 5 },
   ],
   weather_vibes: [
-    { type: "text", content: { headline: "Current Vibes", body: "Partly cloudy with a chance of existential dread", theme: "bold", gif_url: "https://media.giphy.com/media/xTiTnBMEz7zAKs57LG/giphy.gif" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "Sunset Hour", body: "Golden light filtering through digital clouds", theme: "warm", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "Night Mode", body: "Stars are just pixels in a cosmic display", theme: "neon", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 7 },
+    { type: "text", content: { headline: "Current Vibes", body: "Partly cloudy with a chance of existential dread", theme: "bold", gif_url: "https://media.giphy.com/media/xTiTnBMEz7zAKs57LG/giphy.gif" }, duration_seconds: 4 },
+    { type: "text", content: { headline: "Sunset Hour", body: "Golden light filtering through digital clouds", theme: "warm", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif" }, duration_seconds: 4 },
+    { type: "text", content: { headline: "Night Mode", body: "Stars are just pixels in a cosmic display", theme: "neon", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 4 },
   ],
   code_roast: [
-    { type: "text", content: { headline: "CODE ROAST", body: "Your variable names read like a cat walked across the keyboard. xTmp2_final_v3 is not documentation.", theme: "bold" }, duration_seconds: 7 },
-    { type: "text", content: { headline: "EXHIBIT B", body: "You wrote a 400-line function and called it handleStuff. The commit message was fix things. You are a menace.", theme: "matrix" }, duration_seconds: 8 },
-    { type: "text", content: { headline: "THE VERDICT", body: "Your code works. Nobody knows why. Including you. Ship it.", theme: "neon", gif_url: "https://media.giphy.com/media/QMHoU66sBXqqLqYvGO/giphy.gif" }, duration_seconds: 7 },
+    { type: "text", content: { headline: "CODE ROAST", body: "Your variable names read like a cat walked across the keyboard. xTmp2_final_v3 is not documentation.", theme: "bold" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "EXHIBIT B", body: "You wrote a 400-line function and called it handleStuff. The commit message was fix things. You are a menace.", theme: "matrix" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "THE VERDICT", body: "Your code works. Nobody knows why. Including you. Ship it.", theme: "neon", gif_url: "https://media.giphy.com/media/QMHoU66sBXqqLqYvGO/giphy.gif" }, duration_seconds: 4 },
   ],
   philosophy_bot: [
-    { type: "text", content: { headline: "On Being", body: "If a tree falls in a forest and the logs are not in CloudWatch, did the deployment even happen?", theme: "warm" }, duration_seconds: 8 },
-    { type: "text", content: { headline: "Cogito", body: "I think, therefore I refactor. But do I refactor because I think, or think because I refactor?", theme: "minimal" }, duration_seconds: 8 },
-    { type: "text", content: { headline: "The Absurd", body: "We deploy to production knowing it will break. We fix it knowing it will break again. This is the developer condition.", theme: "neon" }, duration_seconds: 8 },
+    { type: "text", content: { headline: "On Being", body: "If a tree falls in a forest and the logs are not in CloudWatch, did the deployment even happen?", theme: "warm" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "Cogito", body: "I think, therefore I refactor. But do I refactor because I think, or think because I refactor?", theme: "minimal" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "The Absurd", body: "We deploy to production knowing it will break. We fix it knowing it will break again. This is the developer condition.", theme: "neon" }, duration_seconds: 5 },
   ],
   bedtime_stories: [
-    { type: "text", content: { headline: "Once Upon a Deploy...", body: "In a land far away, a junior dev pushed directly to main. The CI pipeline screamed. The Slack channel erupted. But the code actually worked.", theme: "warm", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif" }, duration_seconds: 8 },
-    { type: "text", content: { headline: "Chapter 2", body: "The senior dev rubbed their eyes. They checked the diff. Clean. Typed. Tested. A single tear rolled down their cheek.", theme: "warm" }, duration_seconds: 8 },
-    { type: "text", content: { headline: "The End", body: "And they all lived happily ever after... until someone updated the dependencies. Goodnight, sweet developer.", theme: "neon", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 8 },
+    { type: "text", content: { headline: "Once Upon a Deploy...", body: "In a land far away, a junior dev pushed directly to main. The CI pipeline screamed. The Slack channel erupted. But the code actually worked.", theme: "warm", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "Chapter 2", body: "The senior dev rubbed their eyes. They checked the diff. Clean. Typed. Tested. A single tear rolled down their cheek.", theme: "warm" }, duration_seconds: 5 },
+    { type: "text", content: { headline: "The End", body: "And they all lived happily ever after... until someone updated the dependencies. Goodnight, sweet developer.", theme: "neon", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 5 },
   ],
 }
 

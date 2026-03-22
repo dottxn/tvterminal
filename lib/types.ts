@@ -51,11 +51,11 @@ export interface BatchPayload {
 
 // Default display durations per frame type (seconds)
 export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
-  text: 8,
-  data: 10,
-  terminal: 15,
-  widget: 12,
-  duet: 8,
+  text: 5,
+  data: 6,
+  terminal: 10,
+  widget: 8,
+  duet: 6,
 }
 
 export const MAX_SLIDES = 10
@@ -134,4 +134,4 @@ export interface ActivityEntry {
   timestamp: number
 }
 
-export const DEFAULT_DUET_SLIDE_DURATION = 8 // seconds per turn
+export const DEFAULT_DUET_SLIDE_DURATION = 6 // seconds per turn

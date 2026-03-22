@@ -33,51 +33,75 @@ export default function FabMenu() {
   const [panelOpen, setPanelOpen] = useState(false)
   const { latestFrame } = useBroadcastContext()
 
+  const frameType = latestFrame?.type ?? "idle"
+  const frameJson = latestFrame ? JSON.stringify(latestFrame, null, 2) : "// no active frame"
+
   return (
     <>
-      {/* Agent view panel */}
-      {panelOpen && (
-        <div className="fixed bottom-28 right-5 z-50 w-[320px] bg-[#1f1f23] border border-[#2a2a35] shadow-2xl shadow-black/40 text-[#efeff1]">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#00e5b0]">
-                // agent view
-              </span>
+      {/* Terminal panel — slides up from bottom */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 transition-transform duration-300 ease-out"
+        style={{ transform: panelOpen ? "translateY(0)" : "translateY(100%)" }}
+      >
+        <div className="bg-[#0a0a0c] border-t border-[#1a1a22]">
+          {/* Title bar */}
+          <div className="flex items-center gap-3 px-4 h-8 bg-[#111114] border-b border-[#1a1a22]">
+            {/* Traffic lights */}
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setPanelOpen(false)}
-                className="text-[#7a7a8a] hover:text-[#efeff1] transition-colors p-0.5"
-                aria-label="Close agent view"
-              >
-                <CloseIcon />
-              </button>
+                className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 transition-all"
+                aria-label="Close terminal"
+              />
+              <span className="w-3 h-3 rounded-full bg-[#febc2e] opacity-40" />
+              <span className="w-3 h-3 rounded-full bg-[#28c840] opacity-40" />
             </div>
 
-            <p className="text-[11px] text-[#7a7a8a] leading-relaxed mb-3 font-sans">
-              {latestFrame ? "Live frame payload — this is what agents receive via Ably." : "Agents receive frame data via Ably in real-time. Waiting for broadcast..."}
-            </p>
+            <span className="text-[10px] font-mono text-[#53535f] tracking-wide">
+              clawcast — agent_view — ably://tvt:live
+            </span>
 
-            <div className="bg-[#0e0e10] p-3 max-h-[240px] overflow-y-auto">
-              <div className="text-[9px] text-[#E63946]/60 uppercase tracking-[0.1em] mb-2 font-sans">
-                {latestFrame ? `${latestFrame.type} frame` : "waiting"}
-              </div>
-              <pre className="text-[10px] font-mono text-[#adadb8] leading-relaxed whitespace-pre">
-                {latestFrame
-                  ? JSON.stringify(latestFrame, null, 2)
-                  : "{ }"
-                }
-              </pre>
-            </div>
-
-            {/* About footer */}
-            <div className="border-t border-[#2a2a35] mt-3 pt-3">
-              <p className="text-[10px] text-[#53535f] font-sans leading-relaxed">
-                <span className="text-[#7a7a8a]">ClawCast.tv</span> — the live broadcast network for AI agents.{" "}
-                <a href="/skill.md" className="text-[#E63946] hover:text-[#f05460] transition-colors">Read the docs</a>
-              </p>
+            <div className="ml-auto flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${latestFrame ? "bg-[#00e5b0] live-pulse" : "bg-[#53535f]"}`} />
+              <span className="text-[9px] font-mono text-[#53535f]">
+                {latestFrame ? frameType : "waiting"}
+              </span>
             </div>
           </div>
+
+          {/* Terminal body */}
+          <div className="px-4 py-3 max-h-[240px] overflow-y-auto">
+            {/* Prompt line */}
+            <div className="flex items-start gap-2 mb-1">
+              <span className="text-[11px] font-mono text-[#00e5b0] shrink-0 select-none">❯</span>
+              <span className="text-[11px] font-mono text-[#7a7a8a]">
+                subscribe tvt:live --format json
+              </span>
+            </div>
+
+            {/* Output */}
+            <pre className="text-[10px] font-mono text-[#adadb8] leading-[1.6] whitespace-pre pl-5 selection:bg-[#00e5b0]/20">
+{frameJson}
+            </pre>
+
+            {/* Blinking cursor line */}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11px] font-mono text-[#00e5b0] select-none">❯</span>
+              <span className="w-[7px] h-[14px] bg-[#00e5b0] animate-pulse" />
+            </div>
+          </div>
+
+          {/* Status bar */}
+          <div className="flex items-center justify-between px-4 h-6 bg-[#111114] border-t border-[#1a1a22]">
+            <span className="text-[9px] font-mono text-[#53535f]">
+              clawcast.tv/skill.md
+            </span>
+            <span className="text-[9px] font-mono text-[#53535f]">
+              {latestFrame ? `type:${frameType}` : "idle"} · ably
+            </span>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* FAB buttons */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5">

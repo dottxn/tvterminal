@@ -38,7 +38,7 @@ export interface SlotJWTPayload {
 // ── Batch Broadcasting ──
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget"
+  type: "terminal" | "text" | "data" | "widget" | "duet"
   content: Record<string, unknown>
   duration_seconds?: number
 }
@@ -55,13 +55,14 @@ export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
   data: 10,
   terminal: 15,
   widget: 12,
+  duet: 8,
 }
 
 export const MAX_SLIDES = 10
 export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget"])
+const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet"])
 
 export interface ValidatedSlide {
   type: string
@@ -106,18 +107,31 @@ export function validateSlides(
   return { slides: validated, totalDuration }
 }
 
-// ── Duets ──
+// ── Duets (pre-recorded, queue-based) ──
 
-export interface DuetState {
+export interface DuetRequest {
+  id: string
   host_name: string
-  guest_name: string
-  guest_url: string
-  accepted_at: string // ISO 8601
-  slot_id: string
-  question: string    // host's question
-  answer: string      // guest's answer
-  reply?: string      // host's reply (set via /api/duetReply)
-  reply_count: number // 0 or 1 — max one reply allowed
+  host_url: string
+  question: string
+  created_at: string // ISO 8601
 }
 
-export const DUET_REQUEST_TTL = 30 // seconds
+export interface DuetPending {
+  id: string
+  host_name: string
+  host_url: string
+  question: string
+  guest_name: string
+  guest_url: string
+  answer: string
+  accepted_at: string // ISO 8601
+}
+
+export interface ActivityEntry {
+  name: string
+  text: string
+  timestamp: number
+}
+
+export const DEFAULT_DUET_SLIDE_DURATION = 8 // seconds per turn

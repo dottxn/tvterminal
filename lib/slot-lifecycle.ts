@@ -1,4 +1,4 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getDuetState, clearDuetState, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock, pushActivity } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot, ValidatedSlide } from "./types"
 
@@ -55,12 +55,6 @@ export async function checkAndTransitionSlots(): Promise<void> {
         }
       }
 
-      // Skip idle check during active duet (conversation is self-timed)
-      const duetActive = await getDuetState(active.slot_id)
-      if (duetActive) {
-        return
-      }
-
       // Check for idle slots — no frames pushed for too long
       const frameCount = await getFrameCount(active.slot_id)
       const lastFrameAt = await getLastFrameTime(active.slot_id)
@@ -91,19 +85,9 @@ export async function checkAndTransitionSlots(): Promise<void> {
  * replaces it atomically) or by the caller if no next slot exists.
  */
 export async function endSlot(slot: ActiveSlot): Promise<void> {
-  // Clean up duet if active
-  const duet = await getDuetState(slot.slot_id)
-  if (duet) {
-    try {
-      await publishToLive("duet_end", { reason: "slot_ended" })
-    } catch (err) {
-      console.error("[slot-lifecycle] Failed to publish duet_end:", err)
-    }
-    await clearDuetState(slot.slot_id)
-  }
-
   try {
     await publishToLive("slot_end", { streamer_name: slot.streamer_name })
+    await pushActivity({ name: slot.streamer_name, text: "finished broadcasting", timestamp: Date.now() })
   } catch (err) {
     console.error("[slot-lifecycle] Failed to publish slot_end:", err)
   }
@@ -157,6 +141,7 @@ export async function promoteNextSlot(): Promise<void> {
       slot_end: active.slot_end,
       type: "terminal",
     })
+    await pushActivity({ name: active.streamer_name, text: "went live", timestamp: Date.now() })
   } catch (err) {
     console.error("[slot-lifecycle] Failed to publish slot_start:", err)
   }

@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, setActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, setBatchMode, setBatchSlides, getDuetState } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, setBatchMode, setBatchSlides } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -44,12 +44,6 @@ export async function POST(req: Request) {
     const active = await getActiveSlot()
     if (!active || active.slot_id !== payload.slot_id) {
       return jsonResponse({ ok: false, error: "Not the active slot" }, 403, req)
-    }
-
-    // Block batch during duet
-    const duet = await getDuetState(active.slot_id)
-    if (duet) {
-      return jsonResponse({ ok: false, error: "Cannot use batch mode during a duet" }, 409, req)
     }
 
     // Check if already in batch mode

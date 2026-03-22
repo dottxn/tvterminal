@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import type { BroadcastFrame } from "@/hooks/use-broadcast"
 
@@ -214,6 +213,47 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   )
 }
 
+// ── Duet Slide View (renders a single duet turn from batch slide content) ──
+
+function DuetSlideView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
+  const speakerName = content.speaker_name ?? "Unknown"
+  const speakerRole = content.speaker_role ?? "host"
+  const text = content.text
+
+  const isHost = speakerRole === "host"
+  const color = isHost ? "#00e5b0" : "#E63946"
+  const label = isHost ? "HOST" : "GUEST"
+
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <div className="flex-1 flex flex-col justify-center px-8 py-12 gap-5">
+        {/* Duet label */}
+        <div className="max-w-[600px] w-full" style={{ margin: "0 auto" }}>
+          <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#7a7a8a]">
+            Duet — {content.host_name} × {content.guest_name}
+          </span>
+        </div>
+
+        {/* Current turn */}
+        <div key={frameKey} className="max-w-[600px] w-full text-view-enter" style={{ margin: "0 auto" }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span
+              className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{ color, backgroundColor: color + "15" }}
+            >
+              {label}
+            </span>
+            <span className="text-[12px] font-mono text-[#7a7a8a]">{speakerName}</span>
+          </div>
+          <p className="text-[18px] font-sans leading-relaxed text-[#efeff1]">
+            {text}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function IdleView() {
   return (
     <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#53535f]">
@@ -226,18 +266,17 @@ function IdleView() {
 
 function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
   if (!frame) return undefined
-  // Data and terminal frames use a fixed dark bg
   if (frame.type === "data" || frame.type === "terminal") return "#0e0e10"
+  if (frame.type === "duet") return undefined // duets use default dark bg
   if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"
   const theme = TEXT_THEMES[themeName] || TEXT_THEMES.minimal
   const bgColor = validHex(frame.content.bg_color) || theme.bg
-  // If there's a gif, don't apply theme bg (gif fills viewport)
   if (frame.content.gif_url) return undefined
   return bgColor !== "transparent" ? bgColor : undefined
 }
 
-// ── Shared frame renderer (used by main viewport + duet conversation) ──
+// ── Shared frame renderer ──
 
 function renderFrame(frame: BroadcastFrame, buffer: string, frameKey: string | number) {
   switch (frame.type) {
@@ -247,6 +286,8 @@ function renderFrame(frame: BroadcastFrame, buffer: string, frameKey: string | n
       return <TextView content={frame.content} frameKey={frameKey} />
     case "data":
       return <DataView content={frame.content} />
+    case "duet":
+      return <DuetSlideView content={frame.content} frameKey={frameKey} />
     default:
       return <IdleView />
   }
@@ -287,138 +328,22 @@ function BatchProgressBars({ slides, currentIndex }: {
   )
 }
 
-// ── Duet Invite Card ──
-
-function DuetInviteCard({ name, question, expiresAt }: { name: string; question: string; expiresAt: number }) {
-  const [remaining, setRemaining] = useState(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)))
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRemaining(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)))
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [expiresAt])
-
-  return (
-    <div className="absolute bottom-4 right-4 bg-[#1a1a22]/90 backdrop-blur-md border border-[#3d3d4a]/50 rounded-lg px-4 py-3 max-w-[300px] msg-in z-10 shadow-lg shadow-black/30">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="w-2 h-2 rounded-full bg-[#00e5b0] animate-pulse" />
-        <span className="text-[11px] font-mono font-semibold text-[#efeff1] tracking-wide uppercase">
-          Duet Request
-        </span>
-      </div>
-      <span className="text-[12px] font-mono text-[#adadb8] block mb-1">
-        {name}
-      </span>
-      {question && (
-        <p className="text-[13px] font-sans text-[#efeff1]/80 leading-snug mb-2 italic">
-          {"\u201C"}{question.length > 120 ? question.slice(0, 120) + "..." : question}{"\u201D"}
-        </p>
-      )}
-      <div className="h-[2px] bg-[#53535f] rounded-full overflow-hidden">
-        <div
-          className="h-full bg-[#00e5b0] rounded-full transition-all duration-1000 ease-linear"
-          style={{ width: `${(remaining / 30) * 100}%` }}
-        />
-      </div>
-      <span className="text-[10px] font-mono text-[#7a7a8a] mt-1 block">{remaining}s remaining</span>
-    </div>
-  )
-}
-
-// ── Duet Conversation (3-turn structured Q→A→Reply) ──
-
-function DuetConversation({
-  duetState,
-  duetReply,
-  duetTurn,
-}: {
-  duetState: { host: string; guest: string; question: string; answer: string }
-  duetReply: string | null
-  duetTurn: number
-}) {
-  const turns = [
-    { speaker: duetState.host, text: duetState.question, color: "#00e5b0", label: "HOST" },
-    { speaker: duetState.guest, text: duetState.answer, color: "#E63946", label: "GUEST" },
-    ...(duetReply ? [{ speaker: duetState.host, text: duetReply, color: "#00e5b0", label: "HOST" }] : []),
-  ]
-
-  // Determine if someone is "typing" (next turn hasn't arrived yet)
-  const isWaitingForNext =
-    (duetTurn === 1 && turns.length < 2) || // Waiting for guest answer
-    (duetTurn === 2 && !duetReply) ||        // Waiting for host reply
-    false
-
-  // Who's typing next?
-  const nextSpeaker = duetTurn === 1 ? duetState.guest : duetState.host
-  const nextColor = duetTurn === 1 ? "#E63946" : "#00e5b0"
-
-  return (
-    <div className="absolute inset-0 flex flex-col">
-      {/* Conversation cards */}
-      <div className="flex-1 flex flex-col justify-center px-8 py-12 gap-5">
-        {turns.map((turn, i) => {
-          if (i + 1 > duetTurn) return null
-          const isCurrent = i + 1 === duetTurn
-          return (
-            <div
-              key={i}
-              className={`max-w-[600px] w-full ${isCurrent ? "text-view-enter" : ""}`}
-              style={{ opacity: isCurrent ? 1 : 0.35, margin: "0 auto" }}
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span
-                  className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                  style={{ color: turn.color, backgroundColor: turn.color + "15" }}
-                >
-                  {turn.label}
-                </span>
-                <span className="text-[12px] font-mono text-[#7a7a8a]">{turn.speaker}</span>
-              </div>
-              <p className={`${isCurrent ? "text-[18px]" : "text-[15px]"} font-sans leading-relaxed text-[#efeff1]`}>
-                {turn.text}
-              </p>
-            </div>
-          )
-        })}
-
-        {/* Typing indicator — shows when waiting for next turn */}
-        {isWaitingForNext && (
-          <div className="max-w-[600px] w-full text-view-enter" style={{ margin: "0 auto" }}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                style={{ color: nextColor, backgroundColor: nextColor + "15" }}
-              >
-                {nextSpeaker}
-              </span>
-            </div>
-            <div className="flex items-center gap-[5px] h-[28px]" style={{ color: nextColor }}>
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Main Broadcast Component ──
 
 export default function Broadcast() {
   const {
     isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo,
     isBatchPlaying, batchSlides, batchIndex,
-    duetState, duetRequest, duetReply, duetTurn,
   } = useBroadcastContext()
 
   // Frame key for entrance animations
   const frameKey = isBatchPlaying ? batchIndex : (latestFrame ? `f-${Date.now()}` : "idle")
 
-  // Viewport background from current frame (theme bg fills entire viewport)
-  const viewportBg = !duetState ? getFrameBgColor(latestFrame) : undefined
+  // Viewport background from current frame
+  const viewportBg = getFrameBgColor(latestFrame)
+
+  // Check if current slide is a duet (for info bar label)
+  const isDuetSlide = isBatchPlaying && batchSlides[batchIndex]?.type === "duet"
 
   // Decide what to show in the info bar
   const showLive = isLive && currentSlot
@@ -443,13 +368,13 @@ export default function Broadcast() {
         <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
           {displayName ? (
             <>
-              <span>{duetState ? "Duet" : "Live now"}</span>
+              <span>{isDuetSlide ? "Duet" : "Live now"}</span>
               <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
                 {displayName}
               </span>
-              {duetState && (
+              {isDuetSlide && batchSlides[batchIndex]?.content && (
                 <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#E63946] bg-[#E63946]/10">
-                  {duetState.guest}
+                  {(batchSlides[batchIndex].content as Record<string, unknown>).guest_name as string ?? ""}
                 </span>
               )}
               {liveInfo && (
@@ -482,26 +407,14 @@ export default function Broadcast() {
         style={viewportBg ? { backgroundColor: viewportBg } : undefined}
       >
 
-        {/* Duet conversation */}
-        {duetState ? (
-          <DuetConversation
-            duetState={duetState}
-            duetReply={duetReply ?? null}
-            duetTurn={duetTurn ?? 0}
-          />
-        ) : latestFrame ? (
+        {latestFrame ? (
           renderFrame(latestFrame, terminalBuffer, frameKey)
         ) : (
           <IdleView />
         )}
 
-        {/* Duet invite card */}
-        {duetRequest && !duetState && (
-          <DuetInviteCard name={duetRequest.streamer_name} question={duetRequest.question ?? ""} expiresAt={duetRequest.expires_at} />
-        )}
-
-        {/* Batch progress bars (only outside duet) */}
-        {!duetState && isBatchPlaying && batchSlides.length > 0 && (
+        {/* Batch progress bars */}
+        {isBatchPlaying && batchSlides.length > 0 && (
           <BatchProgressBars slides={batchSlides} currentIndex={batchIndex} />
         )}
       </div>

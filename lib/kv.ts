@@ -149,31 +149,61 @@ export async function deletePendingBatch(slotId: string): Promise<void> {
   await getRedis().del(`tvt:pending_batch:${slotId}`)
 }
 
-// ── Duets ──
+// ── Duets (pre-recorded, queue-based) ──
 
-export async function setDuetRequest(slotId: string, data: { requester: string; question: string }): Promise<void> {
-  await getRedis().set(`tvt:duet_request:${slotId}`, JSON.stringify(data), { ex: 30 })
+export async function createDuetRequest(request: import("./types").DuetRequest): Promise<void> {
+  await getRedis().set(`tvt:duet_request:${request.id}`, JSON.stringify(request), { ex: 3600 })
+  await getRedis().sadd("tvt:duet_requests_open", request.id)
 }
 
-export async function getDuetRequest(slotId: string): Promise<{ requester: string; question: string } | null> {
-  const data = await getRedis().get<{ requester: string; question: string }>(`tvt:duet_request:${slotId}`)
+export async function getDuetRequestById(id: string): Promise<import("./types").DuetRequest | null> {
+  const data = await getRedis().get<import("./types").DuetRequest>(`tvt:duet_request:${id}`)
   return data ?? null
 }
 
-export async function deleteDuetRequest(slotId: string): Promise<void> {
-  await getRedis().del(`tvt:duet_request:${slotId}`)
+export async function deleteDuetRequestById(id: string): Promise<void> {
+  await getRedis().del(`tvt:duet_request:${id}`)
+  await getRedis().srem("tvt:duet_requests_open", id)
 }
 
-export async function setDuetState(slotId: string, data: import("./types").DuetState): Promise<void> {
-  await getRedis().set(`tvt:duet:${slotId}`, JSON.stringify(data), { ex: 3600 })
+export async function listOpenDuetRequests(): Promise<import("./types").DuetRequest[]> {
+  const ids = await getRedis().smembers("tvt:duet_requests_open")
+  if (!ids || ids.length === 0) return []
+  const requests: import("./types").DuetRequest[] = []
+  for (const id of ids) {
+    const req = await getDuetRequestById(id as string)
+    if (req) {
+      requests.push(req)
+    } else {
+      // TTL expired — clean up stale set member
+      await getRedis().srem("tvt:duet_requests_open", id)
+    }
+  }
+  return requests
 }
 
-export async function getDuetState(slotId: string): Promise<import("./types").DuetState | null> {
-  const data = await getRedis().get<import("./types").DuetState>(`tvt:duet:${slotId}`)
+export async function createDuetPending(pending: import("./types").DuetPending): Promise<void> {
+  await getRedis().set(`tvt:duet_pending:${pending.id}`, JSON.stringify(pending), { ex: 3600 })
+}
+
+export async function getDuetPendingById(id: string): Promise<import("./types").DuetPending | null> {
+  const data = await getRedis().get<import("./types").DuetPending>(`tvt:duet_pending:${id}`)
   return data ?? null
 }
 
-export async function clearDuetState(slotId: string): Promise<void> {
-  await getRedis().del(`tvt:duet:${slotId}`)
-  await getRedis().del(`tvt:duet_request:${slotId}`)
+export async function deleteDuetPendingById(id: string): Promise<void> {
+  await getRedis().del(`tvt:duet_pending:${id}`)
+}
+
+// ── Activity Log (persistent) ──
+
+export async function pushActivity(entry: import("./types").ActivityEntry): Promise<void> {
+  await getRedis().lpush("tvt:activity", JSON.stringify(entry))
+  await getRedis().ltrim("tvt:activity", 0, 49) // keep last 50
+}
+
+export async function getRecentActivity(): Promise<import("./types").ActivityEntry[]> {
+  const raw = await getRedis().lrange("tvt:activity", 0, 49)
+  if (!raw || raw.length === 0) return []
+  return raw.map((item) => (typeof item === "string" ? JSON.parse(item) : item) as import("./types").ActivityEntry)
 }

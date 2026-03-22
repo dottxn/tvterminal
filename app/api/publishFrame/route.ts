@@ -1,5 +1,5 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, getDuetState } from "@/lib/kv"
+import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -45,12 +45,6 @@ export async function POST(req: Request) {
     const active = await getActiveSlot()
     if (!active || active.slot_id !== payload.slot_id) {
       return jsonResponse({ ok: false, error: "Not the active slot" }, 403, req)
-    }
-
-    // Block frames during active duet (conversation is handled via requestDuet/acceptDuet/duetReply)
-    const duet = await getDuetState(active.slot_id)
-    if (duet) {
-      return jsonResponse({ ok: false, error: "Cannot publish frames during a duet. Use /api/duetReply for the host reply." }, 409, req)
     }
 
     // Block frames during batch playback

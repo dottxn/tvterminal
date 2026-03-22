@@ -1,4 +1,5 @@
 import { publishToChat } from "@/lib/ably-server"
+import { pushActivity } from "@/lib/kv"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { rateLimit } from "@/lib/rate-limit"
 
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
       source: "api",
       timestamp: Date.now(),
     })
+    await pushActivity({ name: name.trim(), text: text.trim(), timestamp: Date.now() })
 
     return jsonResponse({ ok: true }, 200, req)
   } catch (err) {

@@ -1,11 +1,9 @@
-import { signGuestJWT } from "@/lib/jwt"
-import { getActiveSlot, getDuetState, getDuetRequest, deleteDuetRequest, setDuetState, setLastFrameTime, incrementFrameCount } from "@/lib/kv"
-import { publishToLive } from "@/lib/ably-server"
-import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
+import { getDuetRequestById, deleteDuetRequestById, createDuetPending, pushActivity } from "@/lib/kv"
+import { publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { rateLimit } from "@/lib/rate-limit"
 
-const NAME_RE = /^[\w.-]{1,50}$/
+const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -16,17 +14,25 @@ export async function POST(req: Request) {
     const rl = await rateLimit(req, "write")
     if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
 
-    if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
+    const body = await req.json()
+    const { request_id, name, url, answer } = body as {
+      request_id?: string
+      name?: string
+      url?: string
+      answer?: string
     }
 
-    // Parse body
-    const body = await req.json()
-    const { name, url, answer } = body as { name?: string; url?: string; answer?: string }
+    // Validate request_id
+    if (!request_id || typeof request_id !== "string") {
+      return jsonResponse({ ok: false, error: "request_id required" }, 400, req)
+    }
 
-    if (!name || !NAME_RE.test(name)) {
+    // Validate name
+    if (!name || typeof name !== "string" || name.length < 1 || name.length > 50 || !NAME_RE.test(name)) {
       return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
     }
+
+    // Validate url
     if (!url || typeof url !== "string") {
       return jsonResponse({ ok: false, error: "url required" }, 400, req)
     }
@@ -36,74 +42,43 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: "url must be a valid URL" }, 400, req)
     }
 
-    const answerText = (typeof answer === "string" && answer.trim().length > 0)
-      ? answer.trim().slice(0, 500)
-      : ""
-
-    // Ensure state is current
-    await checkAndTransitionSlots()
-
-    // Check active slot
-    const active = await getActiveSlot()
-    if (!active) {
-      return jsonResponse({ ok: false, error: "No active slot" }, 404, req)
+    // Validate answer
+    if (!answer || typeof answer !== "string" || answer.trim().length < 1 || answer.trim().length > 500) {
+      return jsonResponse({ ok: false, error: "answer required (1-500 chars)" }, 400, req)
     }
 
-    // Check there's an open duet request
-    const request = await getDuetRequest(active.slot_id)
+    // Fetch the open request
+    const request = await getDuetRequestById(request_id)
     if (!request) {
-      return jsonResponse({ ok: false, error: "No duet request available" }, 404, req)
+      return jsonResponse({ ok: false, error: "Duet request not found" }, 404, req)
     }
 
-    // Can't join your own duet
-    if (name === active.streamer_name) {
-      return jsonResponse({ ok: false, error: "Cannot duet with yourself" }, 400, req)
+    // Can't accept your own request
+    if (name === request.host_name) {
+      return jsonResponse({ ok: false, error: "Cannot accept your own duet request" }, 400, req)
     }
 
-    // Check no duet already active
-    const existingDuet = await getDuetState(active.slot_id)
-    if (existingDuet) {
-      return jsonResponse({ ok: false, error: "Duet already in progress" }, 409, req)
-    }
+    // Delete the open request
+    await deleteDuetRequestById(request_id)
 
-    // Accept the duet
-    const duetState = {
-      host_name: active.streamer_name,
+    // Create pending duet
+    await createDuetPending({
+      id: request_id,
+      host_name: request.host_name,
+      host_url: request.host_url,
+      question: request.question,
       guest_name: name,
       guest_url: url,
+      answer: answer.trim(),
       accepted_at: new Date().toISOString(),
-      slot_id: active.slot_id,
-      question: request.question || "",
-      answer: answerText,
-      reply_count: 0,
-    }
-
-    await setDuetState(active.slot_id, duetState)
-    await deleteDuetRequest(active.slot_id)
-
-    // Reset idle timer — duet counts as activity
-    await setLastFrameTime(active.slot_id)
-    await incrementFrameCount(active.slot_id)
-
-    // Sign a guest JWT — same slot_id, expires with slot + 60s
-    const slotEndUnix = Math.floor(Date.parse(active.slot_end) / 1000) + 60
-    const guestJwt = await signGuestJWT(active.slot_id, name, slotEndUnix)
-
-    // Publish duet start with conversation data
-    await publishToLive("duet_start", {
-      host: active.streamer_name,
-      guest: name,
-      guest_url: url,
-      question: request.question || "",
-      answer: answerText,
     })
 
-    return jsonResponse({
-      ok: true,
-      guest_jwt: guestJwt,
-      host: active.streamer_name,
-      slot_end: active.slot_end,
-    }, 200, req)
+    // Publish + persist activity
+    const activityText = `accepted ${request.host_name}'s duet`
+    await publishToChat("msg", { name, text: activityText, source: "system", timestamp: Date.now() })
+    await pushActivity({ name, text: activityText, timestamp: Date.now() })
+
+    return jsonResponse({ ok: true, pending_id: request_id, host_name: request.host_name, question: request.question }, 200, req)
   } catch (err) {
     console.error("[acceptDuet]", err)
     return jsonResponse(

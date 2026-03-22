@@ -1,4 +1,4 @@
-import { getActiveSlot, getBatchMode, getBatchSlides, getDuetState, getDuetRequest } from "@/lib/kv"
+import { getActiveSlot, getBatchMode, getBatchSlides, getRecentActivity } from "@/lib/kv"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { rateLimit } from "@/lib/rate-limit"
@@ -48,17 +48,9 @@ export async function GET(req: Request) {
       }
     }
 
-    // Check for active duet
-    const duet = await getDuetState(active.slot_id)
-    if (duet) {
-      response.duet = duet
-    }
-
-    // Check for pending duet request
-    const duetReq = await getDuetRequest(active.slot_id)
-    if (duetReq) {
-      response.duet_request = duetReq
-    }
+    // Include recent activity
+    const activity = await getRecentActivity()
+    response.activity = activity
 
     return jsonResponse(response, 200, req)
   } catch (err) {

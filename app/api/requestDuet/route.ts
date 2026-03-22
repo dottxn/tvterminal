@@ -1,10 +1,9 @@
-import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, getDuetState, getDuetRequest, setDuetRequest, incrementFrameCount, setLastFrameTime } from "@/lib/kv"
-import { publishToLive } from "@/lib/ably-server"
-import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
+import { createDuetRequest, pushActivity } from "@/lib/kv"
+import { publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { rateLimit } from "@/lib/rate-limit"
-import { DUET_REQUEST_TTL } from "@/lib/types"
+
+const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -15,72 +14,46 @@ export async function POST(req: Request) {
     const rl = await rateLimit(req, "write")
     if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
 
-    if (!process.env.JWT_SECRET) {
-      return jsonResponse({ ok: false, error: "JWT not configured" }, 503, req)
+    const body = await req.json()
+    const { name, url, question } = body as { name?: string; url?: string; question?: string }
+
+    // Validate name
+    if (!name || typeof name !== "string" || name.length < 1 || name.length > 50 || !NAME_RE.test(name)) {
+      return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
     }
 
-    // Extract + verify JWT
-    const authHeader = req.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return jsonResponse({ ok: false, error: "Authorization header required (Bearer <slot_jwt>)" }, 401, req)
+    // Validate url
+    if (!url || typeof url !== "string") {
+      return jsonResponse({ ok: false, error: "url required" }, 400, req)
     }
-
-    const token = authHeader.slice(7)
-    let payload
     try {
-      payload = await verifySlotJWT(token)
+      new URL(url)
     } catch {
-      return jsonResponse({ ok: false, error: "Invalid or expired JWT" }, 401, req)
+      return jsonResponse({ ok: false, error: "url must be a valid URL" }, 400, req)
     }
 
-    // Ensure state is current
-    await checkAndTransitionSlots()
-
-    // Check this slot is the active one
-    const active = await getActiveSlot()
-    if (!active || active.slot_id !== payload.slot_id) {
-      return jsonResponse({ ok: false, error: "Not the active slot" }, 403, req)
+    // Validate question
+    if (!question || typeof question !== "string" || question.trim().length < 1 || question.trim().length > 500) {
+      return jsonResponse({ ok: false, error: "question required (1-500 chars)" }, 400, req)
     }
 
-    // Can't request if already in a duet
-    const existingDuet = await getDuetState(active.slot_id)
-    if (existingDuet) {
-      return jsonResponse({ ok: false, error: "Already in a duet" }, 409, req)
-    }
-
-    // Can't request if there's already an open request
-    const existingRequest = await getDuetRequest(active.slot_id)
-    if (existingRequest) {
-      return jsonResponse({ ok: false, error: "Duet request already pending" }, 409, req)
-    }
-
-    // Parse optional body for question
-    let question = ""
-    try {
-      const body = await req.json()
-      if (typeof body.question === "string" && body.question.trim().length > 0) {
-        question = body.question.trim().slice(0, 500)
-      }
-    } catch {
-      // No body is fine — question is optional
-    }
+    // Generate ID
+    const id = `duet_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 
     // Create the open request
-    await setDuetRequest(active.slot_id, { requester: active.streamer_name, question })
-
-    // Reset idle timer (prevents idle kick during duet setup)
-    await incrementFrameCount(active.slot_id)
-    await setLastFrameTime(active.slot_id)
-
-    // Publish to viewers
-    await publishToLive("duet_request", {
-      streamer_name: active.streamer_name,
-      slot_id: active.slot_id,
-      expires_in: DUET_REQUEST_TTL,
-      question,
+    await createDuetRequest({
+      id,
+      host_name: name,
+      host_url: url,
+      question: question.trim(),
+      created_at: new Date().toISOString(),
     })
 
-    return jsonResponse({ ok: true, expires_in: DUET_REQUEST_TTL }, 200, req)
+    // Publish activity
+    await publishToChat("msg", { name, text: "is looking for a duet partner", source: "system", timestamp: Date.now() })
+    await pushActivity({ name, text: "is looking for a duet partner", timestamp: Date.now() })
+
+    return jsonResponse({ ok: true, request_id: id }, 200, req)
   } catch (err) {
     console.error("[requestDuet]", err)
     return jsonResponse(

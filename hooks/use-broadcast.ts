@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useAbly } from "@/lib/ably-client"
 
 export interface BroadcastFrame {
-  type: "terminal" | "text" | "data" | "widget"
+  type: "terminal" | "text" | "data" | "widget" | "duet"
   delta?: boolean
   content: {
     screen?: string
@@ -22,11 +22,20 @@ export interface BroadcastFrame {
     accent_color?: string
     // GIF background
     gif_url?: string
+    // Duet fields
+    turn?: number
+    speaker_name?: string
+    speaker_role?: "host" | "guest"
+    question?: string
+    answer?: string
+    reply?: string
+    host_name?: string
+    guest_name?: string
   }
 }
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget"
+  type: "terminal" | "text" | "data" | "widget" | "duet"
   content: Record<string, unknown>
   duration_seconds: number
 }
@@ -85,21 +94,6 @@ export function useBroadcast() {
   const [isBatchPlaying, setIsBatchPlaying] = useState(false)
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Duet state — structured 3-turn conversation
-  const [duetState, setDuetState] = useState<{
-    host: string
-    guest: string
-    question: string
-    answer: string
-  } | null>(null)
-  const [duetReply, setDuetReply] = useState<string | null>(null)
-  const [duetTurn, setDuetTurn] = useState(0) // 0=none, 1=question, 2=answer, 3=reply
-  const [duetRequest, setDuetRequest] = useState<{
-    streamer_name: string
-    question: string
-    expires_at: number
-  } | null>(null)
-  const duetTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Poll /api/getQueue for real queue state
@@ -137,6 +131,18 @@ export function useBroadcast() {
         const res = await fetch("/api/currentBroadcast")
         if (!res.ok) return
         const data = await res.json() as Record<string, unknown>
+
+        // Hydrate persistent activity log
+        if (Array.isArray(data.activity) && data.activity.length > 0) {
+          const entries = (data.activity as Array<{ name: string; text: string; timestamp: number }>).reverse()
+          setChatMessages(entries.map((e) => ({
+            name: e.name,
+            text: e.text,
+            color: nameToColor(e.name),
+            timestamp: e.timestamp,
+          })))
+        }
+
         if (!data.live) return
 
         // Set slot as live
@@ -171,20 +177,6 @@ export function useBroadcast() {
           setBatchIndex(currentIdx)
           setIsBatchPlaying(true)
         }
-
-        // Hydrate duet if active
-        if (data.duet) {
-          const duet = data.duet as { host_name: string; guest_name: string; question: string; answer: string; reply?: string }
-          setDuetState({
-            host: duet.host_name,
-            guest: duet.guest_name,
-            question: duet.question,
-            answer: duet.answer,
-          })
-          if (duet.reply) {
-            setDuetReply(duet.reply)
-          }
-        }
       } catch {
         // Best-effort hydration
       }
@@ -204,16 +196,6 @@ export function useBroadcast() {
     setIsBatchPlaying(false)
   }, [])
 
-  // Clear duet state helper
-  const clearDuet = useCallback(() => {
-    duetTimersRef.current.forEach(clearTimeout)
-    duetTimersRef.current = []
-    setDuetState(null)
-    setDuetRequest(null)
-    setDuetReply(null)
-    setDuetTurn(0)
-  }, [])
-
   // Push an activity log entry (appears in the sidebar activity feed)
   const pushActivity = useCallback((name: string, text: string) => {
     setChatMessages((prev) => [
@@ -222,52 +204,6 @@ export function useBroadcast() {
     ])
   }, [])
 
-  // Auto-dismiss duet request after expiry
-  useEffect(() => {
-    if (!duetRequest) return
-    const remaining = duetRequest.expires_at - Date.now()
-    if (remaining <= 0) {
-      setDuetRequest(null)
-      return
-    }
-    const timer = setTimeout(() => setDuetRequest(null), remaining)
-    return () => clearTimeout(timer)
-  }, [duetRequest])
-
-  // Duet auto-advance: Turn 1 (8s) → Turn 2 (8s) → wait for reply → Turn 3 (8s)
-  useEffect(() => {
-    if (!duetState) return
-
-    // Clear any old timers
-    duetTimersRef.current.forEach(clearTimeout)
-    duetTimersRef.current = []
-
-    // Start at Turn 1
-    setDuetTurn(1)
-
-    // Advance to Turn 2 after 8s
-    const t1 = setTimeout(() => setDuetTurn(2), 8000)
-    duetTimersRef.current.push(t1)
-
-    return () => {
-      duetTimersRef.current.forEach(clearTimeout)
-      duetTimersRef.current = []
-    }
-  }, [duetState])
-
-  // When reply arrives, show Turn 3 (but only after Turn 2 has had time)
-  useEffect(() => {
-    if (!duetReply || !duetState) return
-
-    if (duetTurn >= 2) {
-      // Already showing answer, advance to reply after a brief pause
-      const t = setTimeout(() => setDuetTurn(3), 1500)
-      duetTimersRef.current.push(t)
-      return () => clearTimeout(t)
-    }
-    // If reply arrives early, it'll naturally show when turn catches up
-  }, [duetReply, duetState, duetTurn])
-
   // Batch auto-advance
   useEffect(() => {
     if (!isBatchPlaying || batchSlides.length === 0) return
@@ -275,7 +211,6 @@ export function useBroadcast() {
     const currentSlide = batchSlides[batchIndex]
     if (!currentSlide) {
       // All slides played — clear everything immediately.
-      // Progress bar is the source of truth; content should not linger.
       clearBatch()
       setLatestFrame(null)
       setTerminalBuffer("")
@@ -284,7 +219,7 @@ export function useBroadcast() {
     }
 
     setLatestFrame({
-      type: currentSlide.type,
+      type: currentSlide.type as BroadcastFrame["type"],
       content: currentSlide.content as BroadcastFrame["content"],
     })
 
@@ -311,7 +246,7 @@ export function useBroadcast() {
     const liveChannel = client.channels.get("tvt:live")
     const chatChannel = client.channels.get("tvt:chat")
 
-    // Frame handler (regular frames only — duets are conversation-based now)
+    // Frame handler
     liveChannel.subscribe("frame", (msg) => {
       const frame = msg.data as BroadcastFrame
       setLatestFrame(frame)
@@ -335,48 +270,7 @@ export function useBroadcast() {
       }
     })
 
-    // Duet request (open invitation with question)
-    liveChannel.subscribe("duet_request", (msg) => {
-      const data = msg.data as { streamer_name: string; expires_in: number; question?: string }
-      setDuetRequest({
-        streamer_name: data.streamer_name,
-        question: data.question || "",
-        expires_at: Date.now() + data.expires_in * 1000,
-      })
-      pushActivity(data.streamer_name, "is looking for a duet partner")
-    })
-
-    // Duet accepted — structured conversation begins
-    liveChannel.subscribe("duet_start", (msg) => {
-      const data = msg.data as { host: string; guest: string; question: string; answer: string }
-      setDuetState({
-        host: data.host,
-        guest: data.guest,
-        question: data.question || "",
-        answer: data.answer || "",
-      })
-      setDuetRequest(null)
-      setDuetReply(null)
-      pushActivity(data.guest, "joined " + data.host + "'s duet")
-    })
-
-    // Host's reply arrives
-    liveChannel.subscribe("duet_reply", (msg) => {
-      const data = msg.data as { host: string; reply: string }
-      setDuetReply(data.reply)
-      pushActivity(data.host, "replied in the duet")
-    })
-
-    // Duet ends
-    liveChannel.subscribe("duet_end", () => {
-      setDuetState(null)
-      setDuetRequest(null)
-      setDuetReply(null)
-      setDuetTurn(0)
-    })
-
     // Slot start — keep the last frame visible until new content arrives
-    // to avoid a flash of "WAITING FOR BROADCAST" between slots
     liveChannel.subscribe("slot_start", (msg) => {
       const data = msg.data as SlotInfo
       // Cancel pending slot_end cleanup — we have a new slot
@@ -388,28 +282,23 @@ export function useBroadcast() {
       setCurrentSlot(data)
       setTerminalBuffer("")
       clearBatch()
-      clearDuet()
       pushActivity(data.streamer_name, "went live")
     })
 
     // Slot end — only clear visual state if no next slot is imminent
-    // The next slot_start will handle the transition smoothly
     liveChannel.subscribe("slot_end", (msg) => {
       const data = msg.data as { streamer_name?: string }
       if (data.streamer_name) {
         pushActivity(data.streamer_name, "finished broadcasting")
       }
       clearBatch()
-      clearDuet()
       // Delay clearing the visual state to allow the next slot_start to arrive
-      // If no slot_start comes within 500ms, show idle state
       const endTimer = setTimeout(() => {
         setIsLive(false)
         setCurrentSlot(null)
         setLatestFrame(null)
         setTerminalBuffer("")
       }, 500)
-      // Store timer so slot_start can cancel it
       slotEndTimerRef.current = endTimer
     })
 
@@ -425,7 +314,6 @@ export function useBroadcast() {
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
-      clearDuet()
     })
 
     // Widget end
@@ -435,7 +323,6 @@ export function useBroadcast() {
       setLatestFrame(null)
       setTerminalBuffer("")
       clearBatch()
-      clearDuet()
     })
 
     // Presence for viewer count
@@ -471,7 +358,7 @@ export function useBroadcast() {
       chatChannel.unsubscribe()
       liveChannel.presence.leave().catch(() => {})
     }
-  }, [client, clearBatch, clearDuet, pushActivity])
+  }, [client, clearBatch, pushActivity])
 
   return {
     connected,
@@ -487,10 +374,5 @@ export function useBroadcast() {
     isBatchPlaying,
     batchSlides,
     batchIndex,
-    // Duet state
-    duetState,
-    duetRequest,
-    duetReply,
-    duetTurn,
   }
 }

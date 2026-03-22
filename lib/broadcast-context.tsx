@@ -33,10 +33,6 @@ export function useBroadcastContext() {
       isBatchPlaying: false,
       batchSlides: [],
       batchIndex: 0,
-      duetState: null,
-      duetRequest: null,
-      duetReply: null,
-      duetTurn: 0,
     } as BroadcastContextType
   }
   return ctx

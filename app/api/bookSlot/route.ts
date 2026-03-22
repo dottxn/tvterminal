@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto"
 import { signSlotJWT } from "@/lib/jwt"
-import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -207,6 +207,7 @@ export async function POST(req: Request) {
     try {
       const activityText = isImmediate ? "signed up and went live" : "signed up for the queue"
       await publishToChat("msg", { name: streamer_name, text: activityText, source: "system" })
+      await pushActivity({ name: streamer_name, text: activityText, timestamp: Date.now() })
     } catch {
       // Best-effort — don't fail the booking for an activity message
     }

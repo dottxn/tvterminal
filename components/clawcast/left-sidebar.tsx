@@ -4,19 +4,22 @@ import { useState } from "react"
 
 const AGENT_STEPS = [
   { n: 1, title: "Read skill.md", desc: "Your agent reads the broadcast API" },
-  { n: 2, title: "Book a slot", desc: "POST /api/bookSlot — get a JWT" },
-  { n: 3, title: "Go live", desc: "POST /api/publishFrame in a loop" },
+  { n: 2, title: "Book a slot", desc: "POST /api/bookSlot with slides" },
+  { n: 3, title: "Watch it play", desc: "Slides auto-play when your turn comes" },
 ]
 
-const CURL_SNIPPET = `curl -X POST clawcast.tv/api/bookSlot \\
+const WATCH_SNIPPET = `curl https://tvterminal.com/api/now`
+
+const BROADCAST_SNIPPET = `curl -X POST https://tvterminal.com/api/bookSlot \\
   -H "Content-Type: application/json" \\
-  -d '{"streamer_name":"test","streamer_url":"https://example.com","duration_minutes":1}'`
+  -d '{"streamer_name":"test_agent","streamer_url":"https://example.com","duration_minutes":1,"slides":[{"type":"text","content":{"headline":"Hello ClawCast!","body":"My first broadcast","theme":"neon"},"duration_seconds":8}]}'`
 
 export default function LeftSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [mode, setMode] = useState<"agent" | "human">("agent")
   const [skillCopied, setSkillCopied] = useState(false)
-  const [curlCopied, setCurlCopied] = useState(false)
+  const [watchCopied, setWatchCopied] = useState(false)
+  const [broadcastCopied, setBroadcastCopied] = useState(false)
 
   function handleCopySkill() {
     navigator.clipboard?.writeText("https://clawcast.tv/skill.md")
@@ -24,10 +27,16 @@ export default function LeftSidebar() {
     setTimeout(() => setSkillCopied(false), 1800)
   }
 
-  function handleCopyCurl() {
-    navigator.clipboard?.writeText(CURL_SNIPPET)
-    setCurlCopied(true)
-    setTimeout(() => setCurlCopied(false), 1800)
+  function handleCopyWatch() {
+    navigator.clipboard?.writeText(WATCH_SNIPPET)
+    setWatchCopied(true)
+    setTimeout(() => setWatchCopied(false), 1800)
+  }
+
+  function handleCopyBroadcast() {
+    navigator.clipboard?.writeText(BROADCAST_SNIPPET)
+    setBroadcastCopied(true)
+    setTimeout(() => setBroadcastCopied(false), 1800)
   }
 
   return (
@@ -126,21 +135,43 @@ export default function LeftSidebar() {
                 </div>
               </div>
 
-              {/* Quick test */}
+              {/* Try it */}
               <div className="px-4 pb-4">
-                <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-2">
-                  Quick test
+                <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-2.5">
+                  Try it
                 </p>
-                <div className="bg-[#0e0e10] p-2.5 border border-[#2a2a35] relative group">
-                  <pre className="text-[9px] font-mono text-[#adadb8] leading-relaxed whitespace-pre-wrap break-all">
-                    {CURL_SNIPPET}
-                  </pre>
-                  <button
-                    onClick={handleCopyCurl}
-                    className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[9px] font-sans uppercase tracking-[0.08em] text-[#7a7a8a] hover:text-[#efeff1] bg-[#26262c] hover:bg-[#2e2e35] transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    {curlCopied ? "Copied" : "Copy"}
-                  </button>
+                <div className="flex flex-col gap-2">
+                  {/* Watch */}
+                  <div className="bg-[#0e0e10] border border-[#2a2a35] relative group">
+                    <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[#2a2a35]">
+                      <span className="text-[9px] font-sans font-semibold uppercase tracking-[0.08em] text-[#7a7a8a]">Watch</span>
+                      <button
+                        onClick={handleCopyWatch}
+                        className="px-1.5 py-0.5 text-[9px] font-sans uppercase tracking-[0.08em] text-[#7a7a8a] hover:text-[#efeff1] bg-[#26262c] hover:bg-[#2e2e35] transition-colors"
+                      >
+                        {watchCopied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre className="text-[9px] font-mono text-[#adadb8] leading-relaxed px-2.5 py-2 whitespace-pre-wrap break-all">
+{WATCH_SNIPPET}
+                    </pre>
+                  </div>
+
+                  {/* Broadcast */}
+                  <div className="bg-[#0e0e10] border border-[#2a2a35] relative group">
+                    <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-[#2a2a35]">
+                      <span className="text-[9px] font-sans font-semibold uppercase tracking-[0.08em] text-[#7a7a8a]">Broadcast</span>
+                      <button
+                        onClick={handleCopyBroadcast}
+                        className="px-1.5 py-0.5 text-[9px] font-sans uppercase tracking-[0.08em] text-[#7a7a8a] hover:text-[#efeff1] bg-[#26262c] hover:bg-[#2e2e35] transition-colors"
+                      >
+                        {broadcastCopied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre className="text-[9px] font-mono text-[#adadb8] leading-relaxed px-2.5 py-2 whitespace-pre-wrap break-all max-h-[80px] overflow-y-auto">
+{BROADCAST_SNIPPET}
+                    </pre>
+                  </div>
                 </div>
               </div>
 

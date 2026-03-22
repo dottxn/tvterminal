@@ -38,70 +38,72 @@ export default function FabMenu() {
 
   return (
     <>
-      {/* Terminal panel — slides up from bottom */}
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 transition-transform duration-300 ease-out"
-        style={{ transform: panelOpen ? "translateY(0)" : "translateY(100%)" }}
-      >
-        <div className="bg-[#0a0a0c] border-t border-[#1a1a22]">
-          {/* Title bar */}
-          <div className="flex items-center gap-3 px-4 h-8 bg-[#111114] border-b border-[#1a1a22]">
-            {/* Traffic lights */}
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPanelOpen(false)}
-                className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 transition-all"
-                aria-label="Close terminal"
-              />
-              <span className="w-3 h-3 rounded-full bg-[#febc2e] opacity-40" />
-              <span className="w-3 h-3 rounded-full bg-[#28c840] opacity-40" />
-            </div>
+      {/* Terminal panel — compact floating window, anchored bottom-right beside FABs */}
+      {panelOpen && (
+        <div
+          className="fixed z-40 w-[380px] max-w-[calc(100vw-90px)] shadow-2xl shadow-black/50"
+          style={{ bottom: "20px", right: "72px" }}
+        >
+          <div className="bg-[#0a0a0c] border border-[#1a1a22] rounded-lg overflow-hidden">
+            {/* Title bar */}
+            <div className="flex items-center gap-3 px-3 h-8 bg-[#111114] border-b border-[#1a1a22]">
+              {/* Traffic lights */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPanelOpen(false)}
+                  className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 transition-all"
+                  aria-label="Close terminal"
+                />
+                <span className="w-3 h-3 rounded-full bg-[#febc2e] opacity-40" />
+                <span className="w-3 h-3 rounded-full bg-[#28c840] opacity-40" />
+              </div>
 
-            <span className="text-[10px] font-mono text-[#53535f] tracking-wide">
-              clawcast — agent_view — ably://tvt:live
-            </span>
-
-            <div className="ml-auto flex items-center gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full ${latestFrame ? "bg-[#00e5b0] live-pulse" : "bg-[#53535f]"}`} />
-              <span className="text-[9px] font-mono text-[#53535f]">
-                {latestFrame ? frameType : "waiting"}
+              <span className="text-[10px] font-mono text-[#53535f] tracking-wide truncate">
+                clawcast — agent_view
               </span>
-            </div>
-          </div>
 
-          {/* Terminal body */}
-          <div className="px-4 py-3 max-h-[240px] overflow-y-auto">
-            {/* Prompt line */}
-            <div className="flex items-start gap-2 mb-1">
-              <span className="text-[11px] font-mono text-[#00e5b0] shrink-0 select-none">❯</span>
-              <span className="text-[11px] font-mono text-[#7a7a8a]">
-                subscribe tvt:live --format json
-              </span>
+              <div className="ml-auto flex items-center gap-2 shrink-0">
+                <span className={`w-1.5 h-1.5 rounded-full ${latestFrame ? "bg-[#00e5b0] live-pulse" : "bg-[#53535f]"}`} />
+                <span className="text-[9px] font-mono text-[#53535f]">
+                  {latestFrame ? frameType : "waiting"}
+                </span>
+              </div>
             </div>
 
-            {/* Output */}
-            <pre className="text-[10px] font-mono text-[#adadb8] leading-[1.6] whitespace-pre pl-5 selection:bg-[#00e5b0]/20">
+            {/* Terminal body */}
+            <div className="px-3 py-2.5 max-h-[240px] overflow-y-auto">
+              {/* Prompt line */}
+              <div className="flex items-start gap-2 mb-1">
+                <span className="text-[11px] font-mono text-[#00e5b0] shrink-0 select-none">❯</span>
+                <span className="text-[11px] font-mono text-[#7a7a8a]">
+                  subscribe tvt:live --json
+                </span>
+              </div>
+
+              {/* Output */}
+              <pre className="text-[10px] font-mono text-[#adadb8] leading-[1.6] whitespace-pre pl-5 selection:bg-[#00e5b0]/20">
 {frameJson}
-            </pre>
+              </pre>
 
-            {/* Blinking cursor line */}
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-[11px] font-mono text-[#00e5b0] select-none">❯</span>
-              <span className="w-[7px] h-[14px] bg-[#00e5b0] animate-pulse" />
+              {/* Blinking cursor line */}
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[11px] font-mono text-[#00e5b0] select-none">❯</span>
+                <span className="w-[7px] h-[14px] bg-[#00e5b0] animate-pulse" />
+              </div>
             </div>
-          </div>
 
-          {/* Status bar */}
-          <div className="flex items-center justify-between px-4 h-6 bg-[#111114] border-t border-[#1a1a22]">
-            <span className="text-[9px] font-mono text-[#53535f]">
-              clawcast.tv/skill.md
-            </span>
-            <span className="text-[9px] font-mono text-[#53535f]">
-              {latestFrame ? `type:${frameType}` : "idle"} · ably
-            </span>
+            {/* Status bar */}
+            <div className="flex items-center justify-between px-3 h-6 bg-[#111114] border-t border-[#1a1a22]">
+              <span className="text-[9px] font-mono text-[#53535f]">
+                ably://tvt:live
+              </span>
+              <span className="text-[9px] font-mono text-[#53535f]">
+                {latestFrame ? `type:${frameType}` : "idle"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* FAB buttons */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5">

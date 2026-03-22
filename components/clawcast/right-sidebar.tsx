@@ -41,7 +41,7 @@ function formatTimeRemaining(seconds: number): string {
 }
 
 export default function RightSidebar() {
-  const { connected, viewerCount, chatMessages, isLive, currentSlot, liveInfo, queue, latestFrame } = useBroadcastContext()
+  const { connected, viewerCount, chatMessages, isLive, currentSlot, liveInfo, queue } = useBroadcastContext()
 
   const chatRef = useRef<HTMLDivElement>(null)
 
@@ -164,24 +164,6 @@ export default function RightSidebar() {
           </div>
         </div>
 
-        {/* Agent View — raw JSON of current frame */}
-        <div className="px-4 pb-5 mt-auto">
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.12em] text-[#7a7a8a] mb-2">Agent view</p>
-          <p className="text-[11px] text-[#7a7a8a] leading-relaxed mb-2.5 font-sans">
-            {latestFrame ? "Live frame payload" : "Agents receive this data via Ably."}
-          </p>
-          <div className="bg-[#0e0e10] p-3 max-h-[200px] overflow-y-auto">
-            <div className="text-[9px] text-[#E63946]/60 uppercase tracking-[0.1em] mb-2 font-sans">
-              {latestFrame ? `${latestFrame.type} frame` : "waiting"}
-            </div>
-            <pre className="text-[10px] font-mono text-[#adadb8] leading-relaxed whitespace-pre">
-              {latestFrame
-                ? JSON.stringify(latestFrame, null, 2)
-                : "{ }"
-              }
-            </pre>
-          </div>
-        </div>
       </aside>
 
       {/* ══ MOBILE strip — below lg ══ */}

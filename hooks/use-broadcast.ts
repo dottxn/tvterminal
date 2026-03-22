@@ -92,7 +92,9 @@ export function useBroadcast() {
   const [batchSlides, setBatchSlides] = useState<BatchSlide[]>([])
   const [batchIndex, setBatchIndex] = useState(0)
   const [isBatchPlaying, setIsBatchPlaying] = useState(false)
+  const [isDuetTyping, setIsDuetTyping] = useState(false)
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -191,9 +193,14 @@ export function useBroadcast() {
       clearTimeout(batchTimerRef.current)
       batchTimerRef.current = null
     }
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
     setBatchSlides([])
     setBatchIndex(0)
     setIsBatchPlaying(false)
+    setIsDuetTyping(false)
   }, [])
 
   // Push an activity log entry (appears in the sidebar activity feed)
@@ -204,7 +211,7 @@ export function useBroadcast() {
     ])
   }, [])
 
-  // Batch auto-advance
+  // Batch auto-advance (with duet typing indicators)
   useEffect(() => {
     if (!isBatchPlaying || batchSlides.length === 0) return
 
@@ -222,19 +229,44 @@ export function useBroadcast() {
       type: currentSlide.type as BroadcastFrame["type"],
       content: currentSlide.content as BroadcastFrame["content"],
     })
+    setIsDuetTyping(false)
 
     if (currentSlide.type !== "terminal") {
       setTerminalBuffer("")
     }
 
-    batchTimerRef.current = setTimeout(() => {
-      setBatchIndex((prev) => prev + 1)
-    }, currentSlide.duration_seconds * 1000)
+    // Check if the NEXT slide is also a duet (to show typing indicator)
+    const nextSlide = batchSlides[batchIndex + 1]
+    const isCurrentDuet = currentSlide.type === "duet"
+    const isNextDuet = nextSlide?.type === "duet"
+    const TYPING_DURATION = 2000 // 2s typing indicator
+
+    if (isCurrentDuet && isNextDuet) {
+      // Show typing indicator 2s before the slide ends, then advance
+      const showTypingAt = Math.max(0, currentSlide.duration_seconds * 1000 - TYPING_DURATION)
+
+      typingTimerRef.current = setTimeout(() => {
+        setIsDuetTyping(true)
+      }, showTypingAt)
+
+      batchTimerRef.current = setTimeout(() => {
+        setBatchIndex((prev) => prev + 1)
+      }, currentSlide.duration_seconds * 1000)
+    } else {
+      // Normal advance (non-duet or last duet slide)
+      batchTimerRef.current = setTimeout(() => {
+        setBatchIndex((prev) => prev + 1)
+      }, currentSlide.duration_seconds * 1000)
+    }
 
     return () => {
       if (batchTimerRef.current) {
         clearTimeout(batchTimerRef.current)
         batchTimerRef.current = null
+      }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current)
+        typingTimerRef.current = null
       }
     }
   }, [isBatchPlaying, batchSlides, batchIndex, clearBatch, fetchQueue])
@@ -266,7 +298,19 @@ export function useBroadcast() {
         setBatchSlides(data.slides)
         setBatchIndex(0)
         setIsBatchPlaying(true)
+        setIsDuetTyping(false)
         setTerminalBuffer("")
+
+        // If this is a duet batch, push a duet-specific activity notification
+        const firstSlide = data.slides[0]
+        if (firstSlide?.type === "duet") {
+          const c = firstSlide.content as Record<string, unknown>
+          const hostName = c.host_name as string
+          const guestName = c.guest_name as string
+          if (hostName && guestName) {
+            pushActivity(hostName, `duet with ${guestName} is live`)
+          }
+        }
       }
     })
 
@@ -374,5 +418,6 @@ export function useBroadcast() {
     isBatchPlaying,
     batchSlides,
     batchIndex,
+    isDuetTyping,
   }
 }

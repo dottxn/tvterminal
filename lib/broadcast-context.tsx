@@ -33,6 +33,7 @@ export function useBroadcastContext() {
       isBatchPlaying: false,
       batchSlides: [],
       batchIndex: 0,
+      isDuetTyping: false,
     } as BroadcastContextType
   }
   return ctx

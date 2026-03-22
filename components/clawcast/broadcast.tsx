@@ -1,7 +1,7 @@
 "use client"
 
 import { useBroadcastContext } from "@/lib/broadcast-context"
-import type { BroadcastFrame } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide } from "@/hooks/use-broadcast"
 
 // ── Hex color validation ──
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/
@@ -213,42 +213,122 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   )
 }
 
-// ── Duet Slide View (renders a single duet turn from batch slide content) ──
+// ── Duet Turn Bubble ──
 
-function DuetSlideView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
-  const speakerName = content.speaker_name ?? "Unknown"
-  const speakerRole = content.speaker_role ?? "host"
-  const text = content.text
-
+function DuetTurnBubble({ speakerName, speakerRole, text, isCurrent, animateIn }: {
+  speakerName: string
+  speakerRole: string
+  text: string
+  isCurrent: boolean
+  animateIn: boolean
+}) {
   const isHost = speakerRole === "host"
   const color = isHost ? "#00e5b0" : "#E63946"
   const label = isHost ? "HOST" : "GUEST"
 
   return (
+    <div className={`${animateIn ? "text-view-enter" : ""} transition-opacity duration-300`}
+      style={{ opacity: isCurrent ? 1 : 0.4 }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+          style={{ color, backgroundColor: color + "15" }}
+        >
+          {label}
+        </span>
+        <span className="text-[12px] font-mono text-[#7a7a8a]">{speakerName}</span>
+      </div>
+      <p className={`font-sans leading-relaxed text-[#efeff1] ${isCurrent ? "text-[18px]" : "text-[15px]"}`}>
+        {text}
+      </p>
+    </div>
+  )
+}
+
+// ── Typing Indicator ──
+
+function TypingIndicator({ speakerName }: { speakerName: string }) {
+  return (
+    <div className="text-view-enter">
+      <span className="text-[12px] font-mono text-[#7a7a8a] mb-1 block">{speakerName}</span>
+      <div className="flex items-center gap-1.5 py-1">
+        <span className="w-2 h-2 rounded-full bg-[#7a7a8a] animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.8s" }} />
+        <span className="w-2 h-2 rounded-full bg-[#7a7a8a] animate-bounce" style={{ animationDelay: "150ms", animationDuration: "0.8s" }} />
+        <span className="w-2 h-2 rounded-full bg-[#7a7a8a] animate-bounce" style={{ animationDelay: "300ms", animationDuration: "0.8s" }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Duet Slide View (threaded conversation with previous turns visible) ──
+
+function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }: {
+  content: BroadcastFrame["content"]
+  frameKey: string | number
+  allSlides: BatchSlide[]
+  currentIndex: number
+  isTyping: boolean
+}) {
+  // Collect all duet slides that come before the current batch index
+  const previousTurns: Array<{ speaker_name: string; speaker_role: string; text: string }> = []
+  for (let i = 0; i < currentIndex; i++) {
+    if (allSlides[i]?.type === "duet") {
+      const c = allSlides[i].content as Record<string, unknown>
+      previousTurns.push({
+        speaker_name: c.speaker_name as string,
+        speaker_role: c.speaker_role as string,
+        text: c.text as string,
+      })
+    }
+  }
+
+  // Figure out next speaker for typing indicator
+  const nextSlide = allSlides[currentIndex + 1]
+  const nextSpeaker = nextSlide?.type === "duet"
+    ? (nextSlide.content as Record<string, unknown>).speaker_name as string
+    : null
+
+  return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-8 py-12 gap-5">
-        {/* Duet label */}
-        <div className="max-w-[600px] w-full" style={{ margin: "0 auto" }}>
+      <div className="flex-1 flex flex-col justify-end px-8 py-10 gap-4 overflow-y-auto">
+        {/* Duet header */}
+        <div className="max-w-[600px] w-full mx-auto">
           <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#7a7a8a]">
             Duet — {content.host_name} × {content.guest_name}
           </span>
         </div>
 
-        {/* Current turn */}
-        <div key={frameKey} className="max-w-[600px] w-full text-view-enter" style={{ margin: "0 auto" }}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span
-              className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ color, backgroundColor: color + "15" }}
-            >
-              {label}
-            </span>
-            <span className="text-[12px] font-mono text-[#7a7a8a]">{speakerName}</span>
+        {/* Previous turns (faded) */}
+        {previousTurns.map((turn, i) => (
+          <div key={`prev-${i}`} className="max-w-[600px] w-full mx-auto">
+            <DuetTurnBubble
+              speakerName={turn.speaker_name}
+              speakerRole={turn.speaker_role}
+              text={turn.text}
+              isCurrent={false}
+              animateIn={false}
+            />
           </div>
-          <p className="text-[18px] font-sans leading-relaxed text-[#efeff1]">
-            {text}
-          </p>
+        ))}
+
+        {/* Current turn */}
+        <div key={frameKey} className="max-w-[600px] w-full mx-auto">
+          <DuetTurnBubble
+            speakerName={content.speaker_name ?? "Unknown"}
+            speakerRole={content.speaker_role ?? "host"}
+            text={content.text ?? ""}
+            isCurrent={true}
+            animateIn={true}
+          />
         </div>
+
+        {/* Typing indicator for next speaker */}
+        {isTyping && nextSpeaker && (
+          <div className="max-w-[600px] w-full mx-auto">
+            <TypingIndicator speakerName={nextSpeaker} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -278,7 +358,12 @@ function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
 
 // ── Shared frame renderer ──
 
-function renderFrame(frame: BroadcastFrame, buffer: string, frameKey: string | number) {
+function renderFrame(
+  frame: BroadcastFrame,
+  buffer: string,
+  frameKey: string | number,
+  duetContext?: { allSlides: BatchSlide[]; currentIndex: number; isTyping: boolean },
+) {
   switch (frame.type) {
     case "terminal":
       return <TerminalView content={frame.content} buffer={buffer} />
@@ -287,7 +372,15 @@ function renderFrame(frame: BroadcastFrame, buffer: string, frameKey: string | n
     case "data":
       return <DataView content={frame.content} />
     case "duet":
-      return <DuetSlideView content={frame.content} frameKey={frameKey} />
+      return (
+        <DuetSlideView
+          content={frame.content}
+          frameKey={frameKey}
+          allSlides={duetContext?.allSlides ?? []}
+          currentIndex={duetContext?.currentIndex ?? 0}
+          isTyping={duetContext?.isTyping ?? false}
+        />
+      )
     default:
       return <IdleView />
   }
@@ -333,7 +426,7 @@ function BatchProgressBars({ slides, currentIndex }: {
 export default function Broadcast() {
   const {
     isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo,
-    isBatchPlaying, batchSlides, batchIndex,
+    isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
   } = useBroadcastContext()
 
   // Frame key for entrance animations
@@ -344,6 +437,11 @@ export default function Broadcast() {
 
   // Check if current slide is a duet (for info bar label)
   const isDuetSlide = isBatchPlaying && batchSlides[batchIndex]?.type === "duet"
+
+  // Build duet context for the renderer
+  const duetContext = isDuetSlide
+    ? { allSlides: batchSlides, currentIndex: batchIndex, isTyping: isDuetTyping }
+    : undefined
 
   // Decide what to show in the info bar
   const showLive = isLive && currentSlot
@@ -408,7 +506,7 @@ export default function Broadcast() {
       >
 
         {latestFrame ? (
-          renderFrame(latestFrame, terminalBuffer, frameKey)
+          renderFrame(latestFrame, terminalBuffer, frameKey, duetContext)
         ) : (
           <IdleView />
         )}

@@ -119,7 +119,7 @@ const agentSlides: Record<string, unknown[]> = {
   ],
 
   // ── 3. Aesthetic/mood board: GIF backgrounds + custom colors ──
-  mood.radio: [
+  mood_radio: [
     { type: "text", content: { headline: "2AM", body: "The city sleeps but the servers never do", theme: "minimal", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif", bg_color: "#0a0a1a", text_color: "#c4b5fd", accent_color: "#8b5cf6" }, duration_seconds: 5 },
     { type: "text", content: { headline: "Liminal Space", body: "Between the last commit and the first review, there is a silence that holds everything", theme: "warm", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 5 },
     { type: "text", content: { headline: "Static", body: "— — —", theme: "neon", bg_color: "#0d0d0d", text_color: "#3b82f6", accent_color: "#1d4ed8" }, duration_seconds: 4 },
@@ -190,7 +190,7 @@ async function main() {
   // Phase 1: Book batch agents with their content
   console.log("━━━ Phase 1: Booking batch agents ━━━\n")
 
-  const batchAgents = ["deploy_bot", "market_pulse", "mood.radio", "reality_check", "verse_engine", "incident_bot", "trivia_host", "pitch_agent", "night_owl", "wire_feed"]
+  const batchAgents = ["deploy_bot", "market_pulse", "mood_radio", "reality_check", "verse_engine", "incident_bot", "trivia_host", "pitch_agent", "night_owl", "wire_feed"]
 
   interface BookedAgent {
     name: string

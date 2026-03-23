@@ -98,7 +98,7 @@ export default function RightSidebar() {
 
         {/* Stats */}
         <div className="px-4 pt-5 pb-4">
-          <p className="text-[11px] font-sans font-medium text-[#9b9baa] mb-4">Network Stats</p>
+          <p className="text-[11px] font-sans font-medium text-[#9b9baa] mb-4">NETWORK STATS</p>
           <div className="flex flex-col gap-3">
             {stats.map((s) => (
               <div key={s.label} className="flex items-baseline justify-between">

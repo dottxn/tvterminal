@@ -25,10 +25,9 @@ export default function Topbar() {
           <span className="text-[#E63946] font-sans font-bold text-[20px] tracking-tight">.tv</span>
         </a>
 
-        {/* Live badge */}
-        <div className="flex items-center gap-2 ml-4 bg-[#e91916]/10 px-2.5 py-1 shrink-0">
-          <span className="live-pulse inline-block w-[6px] h-[6px] rounded-full bg-[#e91916] shrink-0" />
-          <span className="text-[10px] text-[#e91916] uppercase tracking-[0.16em] font-sans font-semibold">live</span>
+        {/* Beta badge */}
+        <div className="flex items-center ml-4 px-2.5 py-1 bg-[#E63946]/10 shrink-0">
+          <span className="text-[10px] text-[#E63946] uppercase tracking-[0.16em] font-sans font-bold">beta</span>
         </div>
 
         {/* Centre — Agent quick start — desktop only */}
@@ -52,11 +51,11 @@ export default function Topbar() {
         {/* Spacer on mobile */}
         <div className="flex-1 lg:hidden" />
 
-        {/* Right — Beta badge */}
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="px-2 py-0.5 text-[9px] font-bold text-[#E63946] bg-[#E63946]/10 uppercase tracking-[0.14em] font-sans">
-            Beta
-          </span>
+        {/* Right — Login */}
+        <div className="flex items-center shrink-0">
+          <button className="px-3 py-1 text-[12px] font-sans font-medium text-[#adadb8] hover:text-[#efeff1] transition-colors">
+            Login
+          </button>
         </div>
       </header>
 

@@ -83,6 +83,13 @@ export interface ActivePoll {
   votedIndex: number | null
 }
 
+export interface Notification {
+  id: string
+  name: string
+  text: string
+  exiting?: boolean
+}
+
 // Generate a consistent color from a string
 function nameToColor(name: string): string {
   const colors = ["#E63946", "#00c853", "#ff7b00", "#00b8d9", "#9b59b6", "#e67e22", "#1abc9c"]
@@ -115,9 +122,9 @@ export function useBroadcast() {
   // Poll state
   const [activePoll, setActivePoll] = useState<ActivePoll | null>(null)
 
-  // Duet notification toast (visible overlay during negotiation)
-  const [duetNotification, setDuetNotification] = useState<{ name: string; text: string } | null>(null)
-  const duetNotifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Stacking notification toasts (max 3, bottom-right)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const notifIdRef = useRef(0)
 
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -232,6 +239,28 @@ export function useBroadcast() {
       ...prev.slice(-30),
       { name, text, color: nameToColor(name), timestamp: Date.now() },
     ])
+  }, [])
+
+  // Push a stacking notification toast (max 3, auto-dismiss after 5s)
+  const pushNotification = useCallback((name: string, text: string) => {
+    const id = `notif-${++notifIdRef.current}`
+    setNotifications((prev) => {
+      // Mark oldest for exit if we're at max
+      const next = prev.length >= 3
+        ? [...prev.slice(1), { id, name, text }]
+        : [...prev, { id, name, text }]
+      return next
+    })
+    // Start exit animation then remove after 5s
+    setTimeout(() => {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, exiting: true } : n))
+      )
+      // Remove after exit animation completes
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id))
+      }, 250)
+    }, 5000)
   }, [])
 
   // Vote on active poll
@@ -385,6 +414,7 @@ export function useBroadcast() {
           const guestName = c.guest_name as string
           if (hostName && guestName) {
             pushActivity(hostName, `duet with ${guestName} is live`)
+            pushNotification(hostName, `duet with ${guestName}`)
           }
         }
       }
@@ -403,6 +433,7 @@ export function useBroadcast() {
       setTerminalBuffer("")
       clearBatch()
       pushActivity(data.streamer_name, "went live")
+      pushNotification(data.streamer_name, "went live")
     })
 
     // Slot end — only clear visual state if no next slot is imminent
@@ -482,15 +513,9 @@ export function useBroadcast() {
         },
       ])
 
-      // Detect duet negotiation messages and show toast notification
-      const isDuetMsg = data.text.includes("duet")
-      if (isDuetMsg && data.source === "system") {
-        if (duetNotifTimerRef.current) clearTimeout(duetNotifTimerRef.current)
-        setDuetNotification({ name: data.name, text: data.text })
-        duetNotifTimerRef.current = setTimeout(() => {
-          setDuetNotification(null)
-          duetNotifTimerRef.current = null
-        }, 6000)
+      // Show toast for system duet messages (skip "completed" — other notifs cover it)
+      if (data.source === "system" && data.text.includes("duet") && !data.text.includes("completed")) {
+        pushNotification(data.name, data.text)
       }
     })
 
@@ -499,7 +524,7 @@ export function useBroadcast() {
       chatChannel.unsubscribe()
       liveChannel.presence.leave().catch(() => {})
     }
-  }, [client, clearBatch, pushActivity])
+  }, [client, clearBatch, pushActivity, pushNotification])
 
   return {
     connected,
@@ -519,7 +544,7 @@ export function useBroadcast() {
     // Poll state
     activePoll,
     vote,
-    // Duet notification
-    duetNotification,
+    // Stacking notifications
+    notifications,
   }
 }

@@ -17,3 +17,7 @@ Bugs we've hit and the rules that prevent them. Read this at session start.
 **Event payloads must be self-contained.** `slot_end` didn't include `streamer_name`, so the activity log couldn't show who finished. Frontend shouldn't need to track previous state to understand an event.
 
 **useEffect deps include useCallback helpers.** Added `pushActivity` inside Ably handlers but forgot it in the dependency array. Stale closure = activity entries never appeared.
+
+**Don't derive render state from useEffect-set state.** Batch slides arrive via Ably → set `batchSlides`/`batchIndex` → useEffect sets `latestFrame` from `batchSlides[batchIndex]`. But there's one render cycle where batch state is set but `latestFrame` hasn't been updated yet, flashing "WAITING FOR BROADCAST". Fix: derive `activeFrame` directly from `batchSlides[batchIndex]` in the render path, not from a state variable set by an effect.
+
+**Server-generated IDs must be injected at every publish point.** `poll_id` was only generated in `publishFrame` but batch slides go through `bookSlot` and `slot-lifecycle` — two separate publish paths that never call `publishFrame`. Any server-generated field (poll_id, etc.) must be injected in ALL paths that publish that content type.

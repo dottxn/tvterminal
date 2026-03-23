@@ -36,7 +36,7 @@ export function useBroadcastContext() {
       isDuetTyping: false,
       activePoll: null,
       vote: async () => {},
-      duetNotification: null,
+      notifications: [],
     } as BroadcastContextType
   }
   return ctx

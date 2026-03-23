@@ -1,7 +1,8 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
-import type { BroadcastFrame, BatchSlide, ActivePoll } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide, ActivePoll, Notification } from "@/hooks/use-broadcast"
 
 // ── Hex color validation ──
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/
@@ -216,18 +217,45 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
 function ImageView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
   const imageUrl = content.image_url
   const caption = content.caption
+  const [imgError, setImgError] = useState(false)
+  const [imgLoaded, setImgLoaded] = useState(false)
+
+  const handleError = useCallback(() => setImgError(true), [])
+  const handleLoad = useCallback(() => setImgLoaded(true), [])
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter relative w-full h-full flex items-center justify-center">
-        {imageUrl && (
+        {imageUrl && !imgError && (
           <img
             src={imageUrl}
             alt={caption || ""}
-            className="max-w-full max-h-full object-contain"
+            className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            onError={handleError}
+            onLoad={handleLoad}
           />
         )}
-        {caption && (
+
+        {/* Fallback: show caption prominently when image fails */}
+        {(!imageUrl || imgError) && (
+          <div className="flex flex-col items-center gap-4 px-8 max-w-[500px]">
+            <div className="w-12 h-12 rounded-full bg-[#2a2a35] flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#53535f]">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                <path d="M6 16l3-3 2 2 4-4 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            {caption && (
+              <p className="text-[16px] font-sans text-[#efeff1] leading-relaxed text-center">
+                {caption}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Caption overlay (when image loads successfully) */}
+        {caption && imageUrl && !imgError && imgLoaded && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-5 pt-10">
             <p className="text-[14px] font-sans text-[#efeff1] leading-relaxed text-center">
               {caption}
@@ -561,7 +589,7 @@ export default function Broadcast() {
   const {
     isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo,
     isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
-    activePoll, vote, duetNotification,
+    activePoll, vote, notifications,
   } = useBroadcastContext()
 
   // During batch playback, derive the active frame directly from batch state.
@@ -665,14 +693,21 @@ export default function Broadcast() {
           <BatchProgressBars slides={batchSlides} currentIndex={batchIndex} />
         )}
 
-        {/* Duet negotiation toast */}
-        {duetNotification && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-view-enter">
-            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#1a1a1f]/95 border border-[#00e5b0]/30 backdrop-blur-sm shadow-lg">
-              <span className="w-2 h-2 rounded-full bg-[#00e5b0] animate-pulse shrink-0" />
-              <span className="text-[12px] font-mono font-semibold text-[#00e5b0]">{duetNotification.name}</span>
-              <span className="text-[12px] font-sans text-[#adadb8]">{duetNotification.text}</span>
-            </div>
+        {/* Stacking notification toasts — bottom-right */}
+        {notifications.length > 0 && (
+          <div className="absolute bottom-10 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
+            {notifications.map((notif) => (
+              <div
+                key={notif.id}
+                className={notif.exiting ? "notif-exit" : "notif-enter"}
+              >
+                <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#1a1a1f]/95 border border-[#00e5b0]/30 backdrop-blur-sm shadow-lg rounded-sm">
+                  <span className="w-2 h-2 rounded-full bg-[#00e5b0] animate-pulse shrink-0" />
+                  <span className="text-[12px] font-mono font-semibold text-[#00e5b0] whitespace-nowrap">{notif.name}</span>
+                  <span className="text-[12px] font-sans text-[#adadb8] whitespace-nowrap">{notif.text}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

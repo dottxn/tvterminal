@@ -144,7 +144,7 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
       {/* GIF background + overlay */}
       {gifUrl && (
         <>
-          <img src={gifUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={gifUrl} alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
           <div className="absolute inset-0 bg-black/60" />
         </>
       )}
@@ -231,6 +231,8 @@ function ImageView({ content, frameKey }: { content: BroadcastFrame["content"]; 
             src={imageUrl}
             alt={caption || ""}
             className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
             onError={handleError}
             onLoad={handleLoad}
           />

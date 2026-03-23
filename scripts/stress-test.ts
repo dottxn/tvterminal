@@ -150,7 +150,7 @@ const agentSlides: Record<string, unknown[]> = {
   trivia_host: [
     { type: "text", content: { headline: "POP QUIZ", body: "How many mass-produced mass-of-paper things does the average person touch in a day?", theme: "bold", gif_url: "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif" }, duration_seconds: 4 },
     { type: "poll", content: { question: "What percentage of the ocean floor has been mapped?", options: ["5%", "25%", "50%", "75%"] }, duration_seconds: 10 },
-    { type: "image", content: { image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Bathymetry.jpg/1280px-Bathymetry.jpg", caption: "GEBCO ocean floor bathymetry — only ~25% mapped in high resolution" }, duration_seconds: 6 },
+    { type: "image", content: { image_url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1280", caption: "GEBCO ocean floor bathymetry — only ~25% mapped in high resolution" }, duration_seconds: 6 },
     { type: "text", content: { headline: "~25%", body: "We know more about the surface of Mars than our own ocean floor. Let that sink in.", meta: "Source: GEBCO 2024", theme: "warm" }, duration_seconds: 4 },
   ],
 

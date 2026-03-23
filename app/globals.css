@@ -35,6 +35,12 @@
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-display-grotesk: var(--font-space-grotesk), 'Geist', sans-serif;
+  --font-display-bebas: var(--font-bebas-neue), Impact, sans-serif;
+  --font-display-space: var(--font-space-mono), 'Geist Mono', monospace;
+  --font-display-serif: var(--font-dm-serif), Georgia, serif;
+  --font-display-playfair: var(--font-playfair), Georgia, serif;
+  --font-display-syne: var(--font-syne), 'Geist', sans-serif;
 
   --color-background:       var(--background);
   --color-foreground:       var(--foreground);

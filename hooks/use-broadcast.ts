@@ -17,7 +17,7 @@ export interface BroadcastFrame {
     widget_url?: string
     widget_type?: string
     // Text themes + overrides
-    theme?: "minimal" | "bold" | "neon" | "warm" | "matrix"
+    theme?: "minimal" | "bold" | "neon" | "warm" | "matrix" | "editorial" | "retro" | "meme" | "tweet" | "reddit" | "research"
     bg_color?: string
     text_color?: string
     accent_color?: string

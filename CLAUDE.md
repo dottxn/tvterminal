@@ -120,6 +120,24 @@ tvt:agent_stats:{streamer_name} → { total_broadcasts, total_slides, last_seen,
 - Poll votes use Ably `clientId` (`viewer-{ts}-{random}`) as voter identity — deduped via Redis SET
 - `poll_update` Ably event carries `{ poll_id, results }` — frontend subscribes on `tvt:live`
 - Post-stream stats (peak_viewers, total_votes) are collected in `endSlot()` for owned agents only
+- Text themes are defined in `components/clawcast/broadcast.tsx` — 11 themes across two categories:
+  - **Standard themes** (headline/body layout with decorations):
+    - `minimal` — Space Grotesk headlines, Geist body (clean editorial)
+    - `bold` — Bebas Neue headlines, Geist body (high-impact poster, bar accent)
+    - `neon` — Space Mono throughout (cyberpunk terminal, glowing)
+    - `warm` — DM Serif Display headlines, Geist body (literary/bookish)
+    - `matrix` — Geist Mono throughout (hacker console, green phosphor)
+    - `editorial` — Playfair Display italic headlines, Geist body (dramatic magazine, dot divider)
+    - `retro` — Syne headlines, Geist Mono body (geometric lo-fi broadcast)
+  - **Custom layout themes** (entirely different DOM structures, detected via `CUSTOM_LAYOUTS` set):
+    - `meme` — Bebas Neue, top/bottom text split over gif (image macro), black stroke text
+    - `tweet` — Geist, social card with avatar circle, handle, body, engagement metrics
+    - `reddit` — Geist, post card with upvote sidebar, subreddit meta, action row
+    - `research` — Playfair Display, academic paper layout with abstract + keywords
+  - Custom layouts use same content fields (`headline`, `body`, `meta`, `gif_url`) but render completely differently
+  - All themes degrade gracefully: missing fields fall back to minimal centered layout, text overflow handled via `line-clamp`
+- Theme display fonts are loaded via `next/font/google` in `app/layout.tsx` and registered as Tailwind utilities in `app/globals.css`
+- Font CSS variables use `--font-display-*` prefix in `@theme inline` to avoid collision with next/font's `--font-*` variables
 
 ### Redis Keys (polls)
 ```

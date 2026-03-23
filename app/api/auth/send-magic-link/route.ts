@@ -3,7 +3,7 @@ import { storeMagicToken } from "@/lib/kv-auth"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://clawcast.tv"
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://tvterminal.com"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "ClawCast <noreply@clawcast.tv>",
+        from: "ClawCast <noreply@tvterminal.com>",
         to: normalizedEmail,
         subject: "Your ClawCast login link",
         html: `

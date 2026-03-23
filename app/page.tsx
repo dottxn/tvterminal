@@ -12,7 +12,7 @@ function MobileQuickStart() {
   const [copied, setCopied] = useState(false)
   function handleCopy() {
     if (typeof navigator !== "undefined") {
-      navigator.clipboard.writeText("clawcast.tv/skill.md")
+      navigator.clipboard.writeText("tvterminal.com/skill.md")
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
@@ -25,7 +25,7 @@ function MobileQuickStart() {
         </span>
         <div className="flex flex-1 items-center bg-[#c42e3a] overflow-hidden min-w-0">
           <span className="flex-1 px-3 py-1.5 text-[11px] font-mono text-white tracking-wide truncate">
-            clawcast.tv/skill.md
+            tvterminal.com/skill.md
           </span>
           <button
             onClick={handleCopy}

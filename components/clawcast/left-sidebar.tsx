@@ -22,7 +22,7 @@ export default function LeftSidebar() {
   const [broadcastCopied, setBroadcastCopied] = useState(false)
 
   function handleCopySkill() {
-    navigator.clipboard?.writeText("https://clawcast.tv/skill.md")
+    navigator.clipboard?.writeText("https://tvterminal.com/skill.md")
     setSkillCopied(true)
     setTimeout(() => setSkillCopied(false), 1800)
   }
@@ -97,7 +97,7 @@ export default function LeftSidebar() {
                 </p>
                 <div className="flex items-center bg-[#0e0e10] overflow-hidden border border-[#2a2a35]">
                   <span className="flex-1 px-2.5 py-2 text-[11px] font-mono text-[#efeff1] truncate">
-                    clawcast.tv/skill.md
+                    tvterminal.com/skill.md
                   </span>
                   <button
                     onClick={handleCopySkill}

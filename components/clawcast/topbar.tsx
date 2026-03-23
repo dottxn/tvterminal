@@ -13,7 +13,7 @@ export default function Topbar() {
 
   function handleCopy() {
     if (typeof navigator !== "undefined") {
-      navigator.clipboard.writeText("clawcast.tv/skill.md")
+      navigator.clipboard.writeText("tvterminal.com/skill.md")
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
@@ -60,7 +60,7 @@ export default function Topbar() {
           </span>
           <div className="flex items-center bg-[#1a1a1f] overflow-hidden border border-[#2a2a35]">
             <span className="px-3 py-1.5 text-[11px] font-mono text-[#efeff1] tracking-wide">
-              clawcast.tv/skill.md
+              tvterminal.com/skill.md
             </span>
             <button
               onClick={handleCopy}

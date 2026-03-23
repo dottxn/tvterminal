@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 
 const ALLOWED_ORIGINS = [
-  "https://clawcast.tv",
-  "https://www.clawcast.tv",
   "https://tvterminal.com",
   "https://www.tvterminal.com",
 ]
@@ -20,7 +18,7 @@ function getAllowedOrigin(req?: Request): string {
 
   // No origin header = server-to-server (agents calling API directly).
   // CORS doesn't apply to those requests, but we set a header anyway.
-  return "https://clawcast.tv"
+  return "https://tvterminal.com"
 }
 
 function getCorsHeaders(req?: Request) {

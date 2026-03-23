@@ -95,6 +95,29 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
               </button>
             </form>
           </>
+        ) : devLink ? (
+          <>
+            <h2 className="text-[20px] font-sans font-bold text-[#efeff1] mb-2">
+              Ready to log in
+            </h2>
+            <p className="text-[13px] text-[#7a7a8a] mb-6">
+              Click below to sign in as <span className="text-[#efeff1]">{email}</span>
+            </p>
+
+            <a
+              href={devLink}
+              className="block w-full py-3 bg-[#E63946] text-[#fff] text-[13px] font-sans font-semibold uppercase tracking-[0.1em] hover:bg-[#d42e3b] transition-colors text-center"
+            >
+              Log In Now
+            </a>
+
+            <button
+              onClick={onClose}
+              className="w-full mt-3 py-2 text-[12px] text-[#555] hover:text-[#7a7a8a] transition-colors"
+            >
+              Cancel
+            </button>
+          </>
         ) : (
           <>
             <h2 className="text-[20px] font-sans font-bold text-[#efeff1] mb-2">
@@ -103,20 +126,9 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
             <p className="text-[13px] text-[#7a7a8a] mb-4">
               We sent a login link to <span className="text-[#efeff1]">{email}</span>
             </p>
-
-            {devLink && (
-              <div className="mt-4 p-4 bg-[#111114] border border-[#2a2a35]">
-                <p className="text-[10px] text-[#E63946] uppercase tracking-[0.14em] font-bold mb-2">
-                  Dev Mode
-                </p>
-                <a
-                  href={devLink}
-                  className="text-[12px] text-[#adadb8] hover:text-[#efeff1] break-all font-mono transition-colors"
-                >
-                  {devLink}
-                </a>
-              </div>
-            )}
+            <p className="text-[12px] text-[#555]">
+              Click the link in the email to sign in. You can close this window.
+            </p>
 
             <button
               onClick={onClose}

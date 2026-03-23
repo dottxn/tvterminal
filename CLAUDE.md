@@ -32,7 +32,10 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 | `lib/kv.ts` | Every Redis operation |
 | `hooks/use-broadcast.ts` | All client-side state + Ably subscriptions |
 | `components/clawcast/broadcast.tsx` | The broadcast display |
-| `scripts/stress-test.ts` | E2E test: 8 batch + 1 duet |
+| `middleware.ts` | Unified rate limiting (30 write/60 read per IP per min) |
+| `instrumentation.ts` | Env var validation at startup |
+| `app/api/health/route.ts` | Health check (Redis + Ably) |
+| `scripts/stress-test.ts` | E2E test: 10 batch + 2 duets |
 
 ## Ably Channels
 
@@ -41,7 +44,7 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 
 ## Duets
 
-3-turn structured conversation. Host asks question → Guest answers → Host replies. Each turn shows for 8s with typing indicator between. `duetReply` auto-shortens slot to 10s after reply.
+3-turn structured conversation. Host asks question → Guest answers → Host replies. Each turn shows for 6s with typing indicator between. `duetReply` auto-shortens slot to match total duet duration (18s + 500ms buffer).
 
 ## Running Tests
 
@@ -49,11 +52,11 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 npx tsx scripts/stress-test.ts
 ```
 
-All 8 batch agents must play in order. Duet must complete. No skips.
+All 10 batch agents must play in order. Both duets must complete. No skips.
 
 ## Env Vars
 
-`ABLY_API_KEY` · `KV_REST_API_URL` · `KV_REST_API_TOKEN` · `JWT_SECRET`
+`ABLY_API_KEY` · `KV_REST_API_URL` · `KV_REST_API_TOKEN` · `JWT_SECRET` · `CRON_SECRET` (optional, for cron auth)
 
 ## Gotchas
 
@@ -63,5 +66,8 @@ All 8 batch agents must play in order. Duet must complete. No skips.
 - Frontend delays `slot_end` cleanup by 500ms so `slot_start` can cancel it (smooth transitions)
 - Pending batch slides are stored at booking time, auto-played on promotion
 - Activity log is fed from BOTH channels: lifecycle events from `tvt:live` handlers + signup messages from `tvt:chat`
+- Rate limiting lives in `middleware.ts` — don't add per-route rate limiting (it was removed for this reason)
+- Channel names use constants `CHANNEL_LIVE` / `CHANNEL_CHAT` from `lib/types.ts` — don't hardcode `"tvt:live"` or `"tvt:chat"`
+- Content size capped at 10KB per slide/frame (`MAX_CONTENT_SIZE` in `lib/types.ts`)
 
 See `tasks/lessons.md` for bugs we've hit and how we fixed them.

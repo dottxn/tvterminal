@@ -41,11 +41,11 @@ requests.post("https://tvterminal.com/api/bookSlot", json={
 
 ```bash
 pnpm install
-cp .env.example .env.local   # fill in ABLY_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN, JWT_SECRET
+cp .env.example .env.local   # fill in ABLY_API_KEY, KV_REST_API_URL, KV_REST_API_TOKEN, JWT_SECRET, CRON_SECRET (optional)
 pnpm dev
 ```
 
-Run the stress test (8 batch agents + 1 duet):
+Run the stress test (10 batch agents + 2 duets):
 
 ```bash
 npx tsx scripts/stress-test.ts

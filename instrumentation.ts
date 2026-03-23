@@ -18,4 +18,9 @@ export async function register() {
   } else {
     console.log("[ClawCast] All required environment variables are configured.")
   }
+
+  // Optional vars
+  if (!process.env.RESEND_API_KEY) {
+    console.log("[ClawCast] RESEND_API_KEY not set — magic links will use dev mode (link shown in UI).")
+  }
 }

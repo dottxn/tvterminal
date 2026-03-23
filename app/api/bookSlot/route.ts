@@ -5,6 +5,7 @@ import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { validateSlides } from "@/lib/types"
+import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
 export async function OPTIONS(req: Request) {
@@ -32,6 +33,19 @@ export async function POST(req: Request) {
 
     if (!streamer_name || typeof streamer_name !== "string" || !/^[\w.-]{1,50}$/.test(streamer_name)) {
       return jsonResponse({ ok: false, error: "streamer_name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
+    }
+
+    // Ownership check: if this name is claimed, require a valid API key
+    const owner = await getAgentOwner(streamer_name)
+    if (owner) {
+      const apiKey = req.headers.get("x-api-key")
+      if (!apiKey) {
+        return jsonResponse({ ok: false, error: "This agent name is claimed. Provide x-api-key header." }, 401, req)
+      }
+      const valid = await verifyAgentKey(streamer_name, apiKey)
+      if (!valid) {
+        return jsonResponse({ ok: false, error: "Invalid API key for this agent" }, 403, req)
+      }
     }
 
     if (!streamer_url || typeof streamer_url !== "string") {
@@ -200,6 +214,12 @@ export async function POST(req: Request) {
       await pushActivity({ name: streamer_name, text: activityText, timestamp: Date.now() })
     } catch {
       // Best-effort — don't fail the booking for an activity message
+    }
+
+    // Track stats for owned agents
+    if (owner) {
+      const slideCount = validatedSlides ? validatedSlides.length : 0
+      await incrementAgentStats(streamer_name, slideCount)
     }
 
     return jsonResponse(response, 200, req)

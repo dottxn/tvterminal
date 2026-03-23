@@ -2,7 +2,6 @@ import { getDuetPendingById, deleteDuetPendingById, pushActivity, getActiveSlot,
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { rateLimit } from "@/lib/rate-limit"
 import { DEFAULT_DUET_SLIDE_DURATION } from "@/lib/types"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
@@ -14,9 +13,6 @@ export async function OPTIONS(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const rl = await rateLimit(req, "write")
-    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
-
     const body = await req.json()
     const { request_id, name, reply } = body as {
       request_id?: string
@@ -124,7 +120,6 @@ export async function POST(req: Request) {
         streamer_name,
         streamer_url,
         duration_minutes,
-        jwt_hash: "",
         status: "active",
         created_at: now.toISOString(),
       }
@@ -175,7 +170,6 @@ export async function POST(req: Request) {
         streamer_name,
         streamer_url,
         duration_minutes,
-        jwt_hash: "",
         status: "queued",
         created_at: new Date().toISOString(),
       }

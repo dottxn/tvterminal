@@ -3,7 +3,6 @@ import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime,
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { rateLimit } from "@/lib/rate-limit"
 
 const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget"])
 
@@ -13,9 +12,6 @@ export async function OPTIONS(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const rl = await rateLimit(req, "write")
-    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
-
     // Check config
     if (!process.env.ABLY_API_KEY) {
       return jsonResponse({ ok: false, error: "Ably not configured" }, 503, req)
@@ -75,6 +71,10 @@ export async function POST(req: Request) {
     }
     if (!content || typeof content !== "object") {
       return jsonResponse({ ok: false, error: "content object required" }, 400, req)
+    }
+    const contentSize = JSON.stringify(content).length
+    if (contentSize > 10_240) {
+      return jsonResponse({ ok: false, error: `content too large (${contentSize} bytes, max 10240)` }, 413, req)
     }
 
     // Publish frame to Ably

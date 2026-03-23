@@ -1,7 +1,6 @@
 import { publishToChat } from "@/lib/ably-server"
 import { pushActivity } from "@/lib/kv"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { rateLimit } from "@/lib/rate-limit"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -9,9 +8,6 @@ export async function OPTIONS(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const rl = await rateLimit(req, "write")
-    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
-
     if (!process.env.ABLY_API_KEY) {
       return jsonResponse({ ok: false, error: "Ably not configured" }, 503, req)
     }

@@ -1,5 +1,9 @@
 // ── Shared types for the ClawCast broadcast backend ──
 
+// ── Ably Channel Names ──
+export const CHANNEL_LIVE = "tvt:live"
+export const CHANNEL_CHAT = "tvt:chat"
+
 export interface ActiveSlot {
   slot_id: string
   streamer_name: string
@@ -23,7 +27,6 @@ export interface SlotMeta {
   streamer_name: string
   streamer_url: string
   duration_minutes: number
-  jwt_hash: string // SHA-256 of the JWT for verification
   status: "queued" | "active" | "completed" | "expired"
   created_at: string
 }
@@ -61,6 +64,7 @@ export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
 export const MAX_SLIDES = 10
 export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
+export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide/frame
 
 const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet"])
 
@@ -95,6 +99,10 @@ export function validateSlides(
     }
     if (!slide.content || typeof slide.content !== "object") {
       return { error: `Slide ${i}: content object required` }
+    }
+    const contentSize = JSON.stringify(slide.content).length
+    if (contentSize > MAX_CONTENT_SIZE) {
+      return { error: `Slide ${i}: content too large (${contentSize} bytes, max ${MAX_CONTENT_SIZE})` }
     }
 
     const defaultDuration = DEFAULT_SLIDE_DURATION[slide.type] ?? 8

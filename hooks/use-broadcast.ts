@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useAbly } from "@/lib/ably-client"
+import { CHANNEL_LIVE, CHANNEL_CHAT } from "@/lib/types"
 
 export interface BroadcastFrame {
   type: "terminal" | "text" | "data" | "widget" | "duet"
@@ -275,8 +276,8 @@ export function useBroadcast() {
   useEffect(() => {
     if (!client) return
 
-    const liveChannel = client.channels.get("tvt:live")
-    const chatChannel = client.channels.get("tvt:chat")
+    const liveChannel = client.channels.get(CHANNEL_LIVE)
+    const chatChannel = client.channels.get(CHANNEL_CHAT)
 
     // Frame handler
     liveChannel.subscribe("frame", (msg) => {

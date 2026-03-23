@@ -2,7 +2,6 @@ import { getActiveSlot, getLastFrameType } from "@/lib/kv"
 import { getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { rateLimit } from "@/lib/rate-limit"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -11,9 +10,6 @@ export async function OPTIONS(req: Request) {
 export async function GET(req: Request) {
   try {
     await checkAndTransitionSlots()
-
-    const rl = await rateLimit(req, "read")
-    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
 
     const active = await getActiveSlot()
 

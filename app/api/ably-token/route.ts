@@ -1,5 +1,6 @@
 import Ably from "ably"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { CHANNEL_LIVE, CHANNEL_CHAT } from "@/lib/types"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -17,8 +18,8 @@ export async function GET(req: Request) {
   const tokenRequest = await ably.auth.createTokenRequest({
     clientId,
     capability: {
-      "tvt:live": ["subscribe", "presence"],
-      "tvt:chat": ["subscribe"],
+      [CHANNEL_LIVE]: ["subscribe", "presence"],
+      [CHANNEL_CHAT]: ["subscribe"],
     },
   })
 

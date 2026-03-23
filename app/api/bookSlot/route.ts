@@ -4,7 +4,6 @@ import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPe
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { rateLimit } from "@/lib/rate-limit"
 import { validateSlides } from "@/lib/types"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
@@ -14,9 +13,6 @@ export async function OPTIONS(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const rl = await rateLimit(req, "write")
-    if (rl.limited) return jsonResponse({ error: "rate_limited" }, 429, req)
-
     // Check config
     if (!process.env.ABLY_API_KEY) {
       return jsonResponse({ ok: false, error: "Ably not configured" }, 503, req)
@@ -100,18 +96,12 @@ export async function POST(req: Request) {
     const jwtExpiry = Math.floor(slotEnd.getTime() / 1000) + 60
     const jwt = await signSlotJWT(slotId, streamer_name, jwtExpiry)
 
-    // Hash JWT for verification
-    const encoder = new TextEncoder()
-    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(jwt))
-    const jwtHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("")
-
     // Store slot meta
     const meta: SlotMeta = {
       slot_id: slotId,
       streamer_name,
       streamer_url,
       duration_minutes: duration,
-      jwt_hash: jwtHash,
       status: isImmediate ? "active" : "queued",
       created_at: now.toISOString(),
     }

@@ -17,8 +17,9 @@ export async function GET(req: Request) {
   try {
     // Auth: must be logged in as admin
     const user = await getAuthUser(req)
+    console.log("[admin] user:", user?.email, "allowed:", [...ADMIN_EMAILS], "env:", process.env.ADMIN_EMAIL)
     if (!user || !ADMIN_EMAILS.has(user.email)) {
-      return jsonResponse({ ok: false, error: "Unauthorized" }, 401, req)
+      return jsonResponse({ ok: false, error: "Unauthorized", debug_email: user?.email ?? "not logged in" }, 401, req)
     }
 
     await checkAndTransitionSlots()

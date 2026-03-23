@@ -2,7 +2,7 @@ import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMet
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot, ValidatedSlide } from "./types"
 import { getAgentOwner, updateAgentStreamStats } from "./kv-auth"
-import { getSlotTotalVotes } from "./kv-poll"
+import { getSlotTotalVotes, setActivePoll } from "./kv-poll"
 
 // Cut off agents who book a slot but don't broadcast anything
 // 30s gives queued agents enough time to discover they've been promoted
@@ -175,6 +175,24 @@ export async function promoteNextSlot(): Promise<void> {
     if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {
       active.slot_end = newSlotEnd.toISOString()
       await setActiveSlot(active)
+    }
+
+    // Inject server-generated poll_id into any poll slides
+    for (const slide of slides) {
+      if (slide.type === "poll") {
+        const c = slide.content as Record<string, unknown>
+        const pollId = `poll_${next.slot_id}_${Date.now()}`
+        c.poll_id = pollId
+        const opts = c.options as string[]
+        await setActivePoll(next.slot_id, {
+          poll_id: pollId,
+          slot_id: next.slot_id,
+          question: c.question as string,
+          options: opts,
+          option_count: opts.length,
+          created_at: Date.now(),
+        })
+      }
     }
 
     // Set batch mode

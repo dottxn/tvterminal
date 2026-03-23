@@ -412,8 +412,8 @@ function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }:
     : null
 
   return (
-    <div className="absolute inset-0 flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-8 py-10 gap-4 overflow-y-auto">
+    <div className="absolute inset-0 flex items-center justify-center overflow-y-auto">
+      <div className="flex flex-col px-8 py-10 gap-4 w-full">
         {/* Duet header */}
         <div className="max-w-[600px] w-full mx-auto">
           <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#7a7a8a]">
@@ -564,15 +564,23 @@ export default function Broadcast() {
     activePoll, vote, duetNotification,
   } = useBroadcastContext()
 
+  // During batch playback, derive the active frame directly from batch state.
+  // latestFrame may lag by one render cycle after batch/slot events arrive,
+  // causing a flash of IdleView. Deriving from batchSlides avoids this.
+  const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
+  const activeFrame: BroadcastFrame | null = currentBatchSlide
+    ? { type: currentBatchSlide.type as BroadcastFrame["type"], content: currentBatchSlide.content as BroadcastFrame["content"] }
+    : latestFrame
+
   // Frame key for entrance animations
-  const frameKey = isBatchPlaying ? batchIndex : (latestFrame ? `f-${Date.now()}` : "idle")
+  const frameKey = isBatchPlaying ? batchIndex : (activeFrame ? `f-${Date.now()}` : "idle")
 
   // Viewport background from current frame
-  const viewportBg = getFrameBgColor(latestFrame)
+  const viewportBg = getFrameBgColor(activeFrame)
 
   // Check if current slide is a duet or poll (for info bar label)
-  const isDuetSlide = isBatchPlaying && batchSlides[batchIndex]?.type === "duet"
-  const isPollSlide = latestFrame?.type === "poll"
+  const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
+  const isPollSlide = activeFrame?.type === "poll"
 
   // Build duet context for the renderer
   const duetContext = isDuetSlide
@@ -646,8 +654,8 @@ export default function Broadcast() {
         style={viewportBg ? { backgroundColor: viewportBg } : undefined}
       >
 
-        {latestFrame ? (
-          renderFrame(latestFrame, terminalBuffer, frameKey, duetContext, pollContext)
+        {activeFrame ? (
+          renderFrame(activeFrame, terminalBuffer, frameKey, duetContext, pollContext)
         ) : (
           <IdleView />
         )}

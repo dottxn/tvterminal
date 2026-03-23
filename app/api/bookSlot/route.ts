@@ -6,6 +6,7 @@ import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { validateSlides } from "@/lib/types"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
+import { setActivePoll } from "@/lib/kv-poll"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
 export async function OPTIONS(req: Request) {
@@ -166,6 +167,24 @@ export async function POST(req: Request) {
         if (newSlotEnd.getTime() < Date.parse(active.slot_end)) {
           active.slot_end = newSlotEnd.toISOString()
           await setActiveSlot(active)
+        }
+
+        // Inject server-generated poll_id into any poll slides
+        for (const slide of validatedSlides) {
+          if (slide.type === "poll") {
+            const c = slide.content as Record<string, unknown>
+            const pollId = `poll_${slotId}_${Date.now()}`
+            c.poll_id = pollId
+            const opts = c.options as string[]
+            await setActivePoll(slotId, {
+              poll_id: pollId,
+              slot_id: slotId,
+              question: c.question as string,
+              options: opts,
+              option_count: opts.length,
+              created_at: Date.now(),
+            })
+          }
         }
 
         await setBatchMode(slotId, batchEndAt.toISOString())

@@ -255,28 +255,37 @@ export function useBroadcast() {
     }
   }, [client])
 
-  // Initialize activePoll when a poll frame is displayed
+  // Initialize activePoll when a poll frame is displayed (via latestFrame or batch)
+  const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
+  const pollSource = currentBatchSlide?.type === "poll"
+    ? currentBatchSlide.content as Record<string, unknown>
+    : latestFrame?.type === "poll"
+      ? latestFrame.content
+      : null
+
   useEffect(() => {
-    if (!latestFrame || latestFrame.type !== "poll") {
+    if (!pollSource) {
       setActivePoll(null)
       return
     }
-    const c = latestFrame.content
-    if (c.poll_id && c.question && c.options) {
+    const pollId = pollSource.poll_id as string | undefined
+    const question = pollSource.question as string | undefined
+    const options = pollSource.options as string[] | undefined
+    if (pollId && question && options) {
       setActivePoll((prev) => {
         // Don't reset if already tracking this poll (preserves vote state)
-        if (prev?.poll_id === c.poll_id) return prev
+        if (prev?.poll_id === pollId) return prev
         return {
-          poll_id: c.poll_id!,
-          question: c.question!,
-          options: c.options!,
-          results: new Array(c.options!.length).fill(0),
+          poll_id: pollId,
+          question,
+          options,
+          results: new Array(options.length).fill(0),
           voted: false,
           votedIndex: null,
         }
       })
     }
-  }, [latestFrame])
+  }, [pollSource])
 
   // Batch auto-advance (with duet typing indicators)
   useEffect(() => {

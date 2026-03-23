@@ -34,6 +34,9 @@ export function useBroadcastContext() {
       batchSlides: [],
       batchIndex: 0,
       isDuetTyping: false,
+      activePoll: null,
+      vote: async () => {},
+      duetNotification: null,
     } as BroadcastContextType
   }
   return ctx

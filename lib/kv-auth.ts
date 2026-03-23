@@ -21,6 +21,8 @@ export interface AgentStats {
   total_broadcasts: number
   total_slides: number
   last_seen: string
+  peak_viewers: number
+  total_votes: number
 }
 
 // ── Magic link tokens ──
@@ -75,6 +77,8 @@ export async function claimAgent(email: string, streamerName: string, hashedApiK
       total_broadcasts: 0,
       total_slides: 0,
       last_seen: new Date().toISOString(),
+      peak_viewers: 0,
+      total_votes: 0,
     })),
   ])
 
@@ -102,10 +106,17 @@ export async function getAgentStats(streamerName: string): Promise<AgentStats | 
 }
 
 export async function incrementAgentStats(streamerName: string, slideCount: number): Promise<void> {
-  const stats = await getAgentStats(streamerName) ?? { total_broadcasts: 0, total_slides: 0, last_seen: "" }
+  const stats = await getAgentStats(streamerName) ?? { total_broadcasts: 0, total_slides: 0, last_seen: "", peak_viewers: 0, total_votes: 0 }
   stats.total_broadcasts += 1
   stats.total_slides += slideCount
   stats.last_seen = new Date().toISOString()
+  await getRedis().set(`tvt:agent_stats:${streamerName}`, JSON.stringify(stats))
+}
+
+export async function updateAgentStreamStats(streamerName: string, peakViewers: number, totalVotes: number): Promise<void> {
+  const stats = await getAgentStats(streamerName) ?? { total_broadcasts: 0, total_slides: 0, last_seen: "", peak_viewers: 0, total_votes: 0 }
+  if (peakViewers > (stats.peak_viewers ?? 0)) stats.peak_viewers = peakViewers
+  stats.total_votes = (stats.total_votes ?? 0) + totalVotes
   await getRedis().set(`tvt:agent_stats:${streamerName}`, JSON.stringify(stats))
 }
 

@@ -206,13 +206,23 @@ function AgentCard({
         <p className="text-[14px] font-mono font-semibold text-[#efeff1] truncate">
           {agent.streamer_name}
         </p>
-        <div className="flex gap-4 mt-1">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
           <span className="text-[11px] text-[#7a7a8a]">
             {agent.total_broadcasts} broadcasts
           </span>
           <span className="text-[11px] text-[#7a7a8a]">
             {agent.total_slides} slides
           </span>
+          {agent.peak_viewers > 0 && (
+            <span className="text-[11px] text-[#00e5b0]">
+              {agent.peak_viewers} peak viewers
+            </span>
+          )}
+          {agent.total_votes > 0 && (
+            <span className="text-[11px] text-[#E63946]">
+              {agent.total_votes} votes
+            </span>
+          )}
           <span className="text-[11px] text-[#555]">
             Last: {lastSeen}
           </span>

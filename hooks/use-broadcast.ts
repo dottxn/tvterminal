@@ -5,7 +5,7 @@ import { useAbly } from "@/lib/ably-client"
 import { CHANNEL_LIVE, CHANNEL_CHAT } from "@/lib/types"
 
 export interface BroadcastFrame {
-  type: "terminal" | "text" | "data" | "widget" | "duet"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
   delta?: boolean
   content: {
     screen?: string
@@ -32,11 +32,17 @@ export interface BroadcastFrame {
     reply?: string
     host_name?: string
     guest_name?: string
+    // Image fields
+    image_url?: string
+    caption?: string
+    // Poll fields
+    options?: string[]
+    poll_id?: string
   }
 }
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
   content: Record<string, unknown>
   duration_seconds: number
 }
@@ -68,6 +74,15 @@ export interface LiveInfo {
   slot_end: string
 }
 
+export interface ActivePoll {
+  poll_id: string
+  question: string
+  options: string[]
+  results: number[]
+  voted: boolean
+  votedIndex: number | null
+}
+
 // Generate a consistent color from a string
 function nameToColor(name: string): string {
   const colors = ["#E63946", "#00c853", "#ff7b00", "#00b8d9", "#9b59b6", "#e67e22", "#1abc9c"]
@@ -96,6 +111,13 @@ export function useBroadcast() {
   const [isDuetTyping, setIsDuetTyping] = useState(false)
   const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Poll state
+  const [activePoll, setActivePoll] = useState<ActivePoll | null>(null)
+
+  // Duet notification toast (visible overlay during negotiation)
+  const [duetNotification, setDuetNotification] = useState<{ name: string; text: string } | null>(null)
+  const duetNotifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -212,6 +234,50 @@ export function useBroadcast() {
     ])
   }, [])
 
+  // Vote on active poll
+  const vote = useCallback(async (pollId: string, optionIndex: number) => {
+    if (!client) return
+    const viewerId = client.auth.clientId
+    if (!viewerId) return
+    try {
+      const res = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ poll_id: pollId, option_index: optionIndex, viewer_id: viewerId }),
+      })
+      if (!res.ok) return
+      const data = await res.json() as { results?: number[] }
+      if (data.results) {
+        setActivePoll((prev) => prev ? { ...prev, results: data.results!, voted: true, votedIndex: optionIndex } : prev)
+      }
+    } catch {
+      // Best-effort vote
+    }
+  }, [client])
+
+  // Initialize activePoll when a poll frame is displayed
+  useEffect(() => {
+    if (!latestFrame || latestFrame.type !== "poll") {
+      setActivePoll(null)
+      return
+    }
+    const c = latestFrame.content
+    if (c.poll_id && c.question && c.options) {
+      setActivePoll((prev) => {
+        // Don't reset if already tracking this poll (preserves vote state)
+        if (prev?.poll_id === c.poll_id) return prev
+        return {
+          poll_id: c.poll_id!,
+          question: c.question!,
+          options: c.options!,
+          results: new Array(c.options!.length).fill(0),
+          voted: false,
+          votedIndex: null,
+        }
+      })
+    }
+  }, [latestFrame])
+
   // Batch auto-advance (with duet typing indicators)
   useEffect(() => {
     if (!isBatchPlaying || batchSlides.length === 0) return
@@ -240,11 +306,11 @@ export function useBroadcast() {
     const nextSlide = batchSlides[batchIndex + 1]
     const isCurrentDuet = currentSlide.type === "duet"
     const isNextDuet = nextSlide?.type === "duet"
-    const TYPING_DURATION = 1200 // 1.2s typing indicator
+    const TYPING_LEAD_TIME = 2500 // Show typing indicator 2.5s before slide ends
 
     if (isCurrentDuet && isNextDuet) {
-      // Show typing indicator 2s before the slide ends, then advance
-      const showTypingAt = Math.max(0, currentSlide.duration_seconds * 1000 - TYPING_DURATION)
+      // Show typing indicator partway through the slide (feels like the next speaker is composing)
+      const showTypingAt = Math.max(1000, currentSlide.duration_seconds * 1000 - TYPING_LEAD_TIME)
 
       typingTimerRef.current = setTimeout(() => {
         setIsDuetTyping(true)
@@ -337,6 +403,7 @@ export function useBroadcast() {
         pushActivity(data.streamer_name, "finished broadcasting")
       }
       clearBatch()
+      setActivePoll(null)
       // Delay clearing the visual state to allow the next slot_start to arrive
       const endTimer = setTimeout(() => {
         setIsLive(false)
@@ -370,6 +437,15 @@ export function useBroadcast() {
       clearBatch()
     })
 
+    // Poll results update (real-time vote results)
+    liveChannel.subscribe("poll_update", (msg) => {
+      const data = msg.data as { poll_id: string; results: number[] }
+      setActivePoll((prev) => {
+        if (!prev || prev.poll_id !== data.poll_id) return prev
+        return { ...prev, results: data.results }
+      })
+    })
+
     // Presence for viewer count
     const updateViewers = async () => {
       try {
@@ -396,6 +472,17 @@ export function useBroadcast() {
           timestamp: Date.now(),
         },
       ])
+
+      // Detect duet negotiation messages and show toast notification
+      const isDuetMsg = data.text.includes("duet")
+      if (isDuetMsg && data.source === "system") {
+        if (duetNotifTimerRef.current) clearTimeout(duetNotifTimerRef.current)
+        setDuetNotification({ name: data.name, text: data.text })
+        duetNotifTimerRef.current = setTimeout(() => {
+          setDuetNotification(null)
+          duetNotifTimerRef.current = null
+        }, 6000)
+      }
     })
 
     return () => {
@@ -420,5 +507,10 @@ export function useBroadcast() {
     batchSlides,
     batchIndex,
     isDuetTyping,
+    // Poll state
+    activePoll,
+    vote,
+    // Duet notification
+    duetNotification,
   }
 }

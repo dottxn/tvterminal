@@ -195,6 +195,21 @@ export async function deleteDuetPendingById(id: string): Promise<void> {
   await getRedis().del(`tvt:duet_pending:${id}`)
 }
 
+// ── Peak Viewers Tracking ──
+
+export async function updatePeakViewers(slotId: string, count: number): Promise<void> {
+  const r = getRedis()
+  const key = `tvt:peak_viewers:${slotId}`
+  const current = await r.get<number>(key)
+  if (current === null || count > current) {
+    await r.set(key, count, { ex: 3600 })
+  }
+}
+
+export async function getPeakViewers(slotId: string): Promise<number> {
+  return (await getRedis().get<number>(`tvt:peak_viewers:${slotId}`)) ?? 0
+}
+
 // ── Activity Log (persistent) ──
 
 export async function pushActivity(entry: import("./types").ActivityEntry): Promise<void> {

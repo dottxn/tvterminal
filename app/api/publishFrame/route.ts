@@ -1,10 +1,12 @@
 import { verifySlotJWT } from "@/lib/jwt"
-import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode } from "@/lib/kv"
+import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime, getBatchMode, updatePeakViewers } from "@/lib/kv"
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
+import { validateImageUrl, validatePollContent } from "@/lib/types"
+import { setActivePoll } from "@/lib/kv-poll"
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget"])
+const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "image", "poll"])
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -77,6 +79,31 @@ export async function POST(req: Request) {
       return jsonResponse({ ok: false, error: `content too large (${contentSize} bytes, max 10240)` }, 413, req)
     }
 
+    // Type-specific validation
+    if (type === "image") {
+      const imageUrl = content.image_url
+      if (typeof imageUrl !== "string" || !validateImageUrl(imageUrl)) {
+        return jsonResponse({ ok: false, error: "image_url required and must be from an allowed domain" }, 400, req)
+      }
+    }
+    if (type === "poll") {
+      const pollError = validatePollContent(content)
+      if (pollError) {
+        return jsonResponse({ ok: false, error: pollError }, 400, req)
+      }
+      // Generate server-side poll ID
+      const pollId = `poll_${active.slot_id}_${Date.now()}`
+      content.poll_id = pollId
+      await setActivePoll(active.slot_id, {
+        poll_id: pollId,
+        slot_id: active.slot_id,
+        question: content.question as string,
+        options: content.options as string[],
+        option_count: (content.options as string[]).length,
+        created_at: Date.now(),
+      })
+    }
+
     // Publish frame to Ably
     await publishToLive("frame", {
       type,
@@ -89,8 +116,9 @@ export async function POST(req: Request) {
     await setLastFrameType(active.slot_id, type)
     await setLastFrameTime(active.slot_id)
 
-    // Get viewer count
+    // Get viewer count + track peak
     const viewerCount = await getViewerCount()
+    await updatePeakViewers(active.slot_id, viewerCount)
 
     return jsonResponse({
       ok: true,

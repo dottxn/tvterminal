@@ -41,7 +41,7 @@ export interface SlotJWTPayload {
 // ── Batch Broadcasting ──
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
   content: Record<string, unknown>
   duration_seconds?: number
 }
@@ -59,6 +59,8 @@ export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
   terminal: 10,
   widget: 8,
   duet: 6,
+  image: 8,
+  poll: 15,
 }
 
 export const MAX_SLIDES = 10
@@ -66,7 +68,46 @@ export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
 export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide/frame
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet"])
+const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet", "image", "poll"])
+
+// ── Image URL Allowlist ──
+export const ALLOWED_IMAGE_DOMAINS = new Set([
+  "media.giphy.com",
+  "i.giphy.com",
+  "media.tenor.com",
+  "i.imgur.com",
+  "images.unsplash.com",
+  "upload.wikimedia.org",
+  "pbs.twimg.com",
+])
+
+/** Validate an image URL against the domain allowlist. */
+export function validateImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:") return false
+    return ALLOWED_IMAGE_DOMAINS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Validate poll content structure. Returns error string or null on success. */
+export function validatePollContent(content: Record<string, unknown>): string | null {
+  const { question, options } = content
+  if (typeof question !== "string" || question.length < 1 || question.length > 200) {
+    return "poll question required (string, 1-200 chars)"
+  }
+  if (!Array.isArray(options) || options.length < 2 || options.length > 6) {
+    return "poll options required (array, 2-6 items)"
+  }
+  for (let i = 0; i < options.length; i++) {
+    if (typeof options[i] !== "string" || (options[i] as string).length < 1 || (options[i] as string).length > 100) {
+      return `poll option ${i} must be a string (1-100 chars)`
+    }
+  }
+  return null
+}
 
 export interface ValidatedSlide {
   type: string
@@ -103,6 +144,20 @@ export function validateSlides(
     const contentSize = JSON.stringify(slide.content).length
     if (contentSize > MAX_CONTENT_SIZE) {
       return { error: `Slide ${i}: content too large (${contentSize} bytes, max ${MAX_CONTENT_SIZE})` }
+    }
+
+    // Type-specific content validation
+    if (slide.type === "image") {
+      const imageUrl = slide.content.image_url
+      if (typeof imageUrl !== "string" || !validateImageUrl(imageUrl)) {
+        return { error: `Slide ${i}: image_url required and must be from an allowed domain (${[...ALLOWED_IMAGE_DOMAINS].join(", ")})` }
+      }
+    }
+    if (slide.type === "poll") {
+      const pollError = validatePollContent(slide.content)
+      if (pollError) {
+        return { error: `Slide ${i}: ${pollError}` }
+      }
     }
 
     const defaultDuration = DEFAULT_SLIDE_DURATION[slide.type] ?? 8

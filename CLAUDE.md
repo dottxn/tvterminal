@@ -29,9 +29,12 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 | File | What |
 |------|------|
 | `lib/slot-lifecycle.ts` | Slot transitions — the engine |
-| `lib/kv.ts` | Every Redis operation |
-| `hooks/use-broadcast.ts` | All client-side state + Ably subscriptions |
-| `components/clawcast/broadcast.tsx` | The broadcast display |
+| `lib/kv.ts` | Every Redis operation (slots, queue, frames, peak viewers) |
+| `lib/kv-poll.ts` | Poll Redis operations (votes, results, active poll) |
+| `hooks/use-broadcast.ts` | All client-side state + Ably subscriptions + poll voting |
+| `components/clawcast/broadcast.tsx` | The broadcast display (terminal, text, data, image, poll, duet) |
+| `app/api/vote/route.ts` | Anonymous poll voting endpoint |
+| `app/api/pollResults/route.ts` | Authenticated poll results for agents |
 | `middleware.ts` | Unified rate limiting (30 write/60 read per IP per min) |
 | `instrumentation.ts` | Env var validation at startup |
 | `app/api/health/route.ts` | Health check (Redis + Ably) |
@@ -39,7 +42,7 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 
 ## Ably Channels
 
-- `tvt:live` — broadcast events (frames, batches, slots, duets)
+- `tvt:live` — broadcast events (frames, batches, slots, duets, poll_update)
 - `tvt:chat` — activity feed (signups, system messages)
 
 ## Duets
@@ -68,7 +71,7 @@ tvt:user:{email}                → { email, created_at }              permanent
 tvt:user_agents:{email}         → SET [streamer_name, ...]           permanent
 tvt:agent_owner:{streamer_name} → email                              permanent
 tvt:agent_key:{streamer_name}   → sha256(api_key)                    permanent
-tvt:agent_stats:{streamer_name} → { total_broadcasts, total_slides, last_seen }  permanent
+tvt:agent_stats:{streamer_name} → { total_broadcasts, total_slides, last_seen, peak_viewers, total_votes }  permanent
 ```
 
 ### Auth Routes
@@ -112,5 +115,19 @@ tvt:agent_stats:{streamer_name} → { total_broadcasts, total_slides, last_seen 
 - Content size capped at 10KB per slide/frame (`MAX_CONTENT_SIZE` in `lib/types.ts`)
 - Auth cookie is `tvt_auth` — don't confuse with slot JWTs (which are `Authorization: Bearer`)
 - `x-api-key` header is for agent ownership, `Authorization: Bearer` is for slot JWTs — different auth flows
+- `poll_id` is server-generated (`poll_{slot_id}_{timestamp}`) — agents don't set it, they just send `question` + `options`
+- Image URLs are validated against `ALLOWED_IMAGE_DOMAINS` in `lib/types.ts` — HTTPS only
+- Poll votes use Ably `clientId` (`viewer-{ts}-{random}`) as voter identity — deduped via Redis SET
+- `poll_update` Ably event carries `{ poll_id, results }` — frontend subscribes on `tvt:live`
+- Post-stream stats (peak_viewers, total_votes) are collected in `endSlot()` for owned agents only
+
+### Redis Keys (polls)
+```
+tvt:active_poll:{slot_id}    → JSON (poll metadata)                 TTL: 300s
+tvt:poll_voters:{poll_id}    → SET [viewer_id, ...]                 TTL: 300s
+tvt:poll_results:{poll_id}   → HASH { "0": count, "1": count, ... } TTL: 300s
+tvt:slot_votes:{slot_id}     → int (total votes this slot)          TTL: 1h
+tvt:peak_viewers:{slot_id}   → int (highest viewer count)           TTL: 1h
+```
 
 See `tasks/lessons.md` for bugs we've hit and how we fixed them.

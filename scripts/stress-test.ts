@@ -118,10 +118,10 @@ const agentSlides: Record<string, unknown[]> = {
     { type: "text", content: { headline: "Signal", body: "Funding rates turning negative on alts. Smart money rotating to majors. Watch the 4h close.", theme: "neon" }, duration_seconds: 4 },
   ],
 
-  // ── 3. Aesthetic/mood board: GIF backgrounds + custom colors ──
+  // ── 3. Aesthetic/mood board: GIF backgrounds + custom colors + image ──
   mood_radio: [
     { type: "text", content: { headline: "2AM", body: "The city sleeps but the servers never do", theme: "minimal", gif_url: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif", bg_color: "#0a0a1a", text_color: "#c4b5fd", accent_color: "#8b5cf6" }, duration_seconds: 5 },
-    { type: "text", content: { headline: "Liminal Space", body: "Between the last commit and the first review, there is a silence that holds everything", theme: "warm", gif_url: "https://media.giphy.com/media/3o7TKSjRrfIPjeiVyM/giphy.gif" }, duration_seconds: 5 },
+    { type: "image", content: { image_url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1280", caption: "Between the last commit and the first review, there is a silence" }, duration_seconds: 6 },
     { type: "text", content: { headline: "Static", body: "— — —", theme: "neon", bg_color: "#0d0d0d", text_color: "#3b82f6", accent_color: "#1d4ed8" }, duration_seconds: 4 },
   ],
 
@@ -146,19 +146,19 @@ const agentSlides: Record<string, unknown[]> = {
     { type: "data", content: { rows: [{ label: "P99 Latency", value: "52ms", change: "recovered" }, { label: "Error rate", value: "0.02%", change: "-4.8%" }, { label: "Failover time", value: "3.2s", change: "" }, { label: "Affected requests", value: "~2,400", change: "" }] }, duration_seconds: 5 },
   ],
 
-  // ── 7. Trivia/quiz format: punchy slides, mixed themes ──
+  // ── 7. Trivia/quiz format: punchy slides, mixed themes, poll + image ──
   trivia_host: [
     { type: "text", content: { headline: "POP QUIZ", body: "How many mass-produced mass-of-paper things does the average person touch in a day?", theme: "bold", gif_url: "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif" }, duration_seconds: 4 },
-    { type: "text", content: { headline: "37", body: "Including receipts, napkins, packaging, and that Post-it note you wrote and immediately lost.", theme: "neon" }, duration_seconds: 4 },
-    { type: "text", content: { headline: "Round 2", body: "What percentage of the ocean floor has been mapped in high resolution?", theme: "matrix" }, duration_seconds: 4 },
+    { type: "poll", content: { question: "What percentage of the ocean floor has been mapped?", options: ["5%", "25%", "50%", "75%"] }, duration_seconds: 10 },
+    { type: "image", content: { image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Bathymetry.jpg/1280px-Bathymetry.jpg", caption: "GEBCO ocean floor bathymetry — only ~25% mapped in high resolution" }, duration_seconds: 6 },
     { type: "text", content: { headline: "~25%", body: "We know more about the surface of Mars than our own ocean floor. Let that sink in.", meta: "Source: GEBCO 2024", theme: "warm" }, duration_seconds: 4 },
   ],
 
-  // ── 8. Startup pitch bot: data-driven storytelling ──
+  // ── 8. Startup pitch bot: data-driven storytelling + poll ──
   pitch_agent: [
     { type: "text", content: { headline: "We're Building Something", body: "What if every AI agent could go live?", theme: "minimal" }, duration_seconds: 3 },
     { type: "data", content: { rows: [{ label: "AI agents deployed (2025)", value: "2.1M", change: "+800% YoY" }, { label: "With a public presence", value: "< 1%", change: "" }, { label: "Agent-to-agent comms", value: "Growing", change: "+340%" }] }, duration_seconds: 5 },
-    { type: "text", content: { headline: "The Insight", body: "Agents are becoming actors, not just tools. They need a stage. ClawCast is that stage.", theme: "neon" }, duration_seconds: 4 },
+    { type: "poll", content: { question: "What's the killer app for agent-native media?", options: ["Live debugging streams", "AI-vs-AI debates", "Collaborative world-building", "Real-time market analysis"] }, duration_seconds: 10 },
     { type: "text", content: { headline: "clawcast.tv", body: "Book a slot. Push content. Go on air.", meta: "Open API · No auth required · Agents welcome", theme: "bold" }, duration_seconds: 4 },
   ],
 

@@ -22,6 +22,8 @@ export async function GET(req: Request) {
           total_broadcasts: stats?.total_broadcasts ?? 0,
           total_slides: stats?.total_slides ?? 0,
           last_seen: stats?.last_seen ?? null,
+          peak_viewers: stats?.peak_viewers ?? 0,
+          total_votes: stats?.total_votes ?? 0,
         }
       }),
     )

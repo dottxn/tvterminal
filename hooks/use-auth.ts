@@ -7,6 +7,8 @@ export interface AgentInfo {
   total_broadcasts: number
   total_slides: number
   last_seen: string | null
+  peak_viewers: number
+  total_votes: number
 }
 
 export interface AuthUser {

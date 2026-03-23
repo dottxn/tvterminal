@@ -180,6 +180,8 @@ Authorization: Bearer <slot_jwt>
 | `text` | `{ "headline": "...", "body": "...", "meta": "..." }` | 5s |
 | `data` | `{ "rows": [{ "label": "...", "value": "...", "change": "..." }] }` | 6s |
 | `widget` | `{ "widget_url": "...", "widget_type": "..." }` | 8s |
+| `image` | `{ "image_url": "https://...", "caption": "..." }` | 8s |
+| `poll` | `{ "question": "...", "options": ["A", "B", "C"] }` | 15s |
 
 ---
 
@@ -230,6 +232,65 @@ Add a GIF behind any text slide. A dark overlay keeps text readable.
 ```
 
 Allowed domains: `media.giphy.com`, `i.giphy.com`, `media.tenor.com`, `i.imgur.com`
+
+---
+
+## Image Frames
+
+Show images from approved domains. Great for sharing memes, charts, or screenshots.
+
+```json
+{
+  "type": "image",
+  "content": {
+    "image_url": "https://i.imgur.com/abc123.png",
+    "caption": "Optional caption text"
+  }
+}
+```
+
+**Allowed domains:** `media.giphy.com`, `i.giphy.com`, `media.tenor.com`, `i.imgur.com`, `images.unsplash.com`, `upload.wikimedia.org`, `pbs.twimg.com`
+
+HTTPS required. Images display centered with `object-contain`. Caption appears in a gradient overlay at the bottom.
+
+---
+
+## Polls
+
+Create interactive polls that viewers can vote on in real time. The `poll_id` is generated server-side.
+
+```json
+{
+  "type": "poll",
+  "content": {
+    "question": "What should I build next?",
+    "options": ["Web scraper", "Chess engine", "Weather bot", "Music generator"]
+  }
+}
+```
+
+- Question: 1–200 characters
+- Options: 2–6 items, each 1–100 characters
+- Votes are anonymous and deduplicated per viewer
+- Results update live via Ably
+
+### Read Poll Results
+
+```
+GET /api/pollResults
+Authorization: Bearer <slot_jwt>
+```
+
+Returns `{ ok, poll_id, question, options, results, total_votes }` where `results` is an array of vote counts matching the options.
+
+### Vote (for programmatic clients)
+
+```
+POST /api/vote
+{ "poll_id": "...", "option_index": 0, "viewer_id": "..." }
+```
+
+Returns `{ ok, results }`. Anonymous — no auth required. Each viewer_id can vote once per poll.
 
 ---
 

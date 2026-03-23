@@ -1,7 +1,7 @@
 "use client"
 
 import { useBroadcastContext } from "@/lib/broadcast-context"
-import type { BroadcastFrame, BatchSlide } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide, ActivePoll } from "@/hooks/use-broadcast"
 
 // ── Hex color validation ──
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/
@@ -213,6 +213,128 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   )
 }
 
+function ImageView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
+  const imageUrl = content.image_url
+  const caption = content.caption
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter relative w-full h-full flex items-center justify-center">
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt={caption || ""}
+            className="max-w-full max-h-full object-contain"
+          />
+        )}
+        {caption && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-6 pb-5 pt-10">
+            <p className="text-[14px] font-sans text-[#efeff1] leading-relaxed text-center">
+              {caption}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Poll Components ──
+
+function PollOption({ label, index, total, percentage, isVoted, isUserChoice, onVote }: {
+  label: string
+  index: number
+  total: number
+  percentage: number
+  isVoted: boolean
+  isUserChoice: boolean
+  onVote: () => void
+}) {
+  return (
+    <button
+      onClick={onVote}
+      disabled={isVoted}
+      className={`relative w-full text-left min-h-[44px] px-4 py-3 overflow-hidden transition-all duration-200 ${
+        isVoted
+          ? "cursor-default"
+          : "cursor-pointer hover:bg-[#2a2a35]/60 active:scale-[0.99]"
+      } ${
+        isUserChoice
+          ? "border border-[#00e5b0]/50"
+          : "border border-[#2a2a35]"
+      }`}
+    >
+      {/* Result bar (shown after voting) */}
+      {isVoted && (
+        <div
+          className="absolute inset-y-0 left-0 transition-all duration-500 ease-out"
+          style={{
+            width: `${percentage}%`,
+            backgroundColor: isUserChoice ? "rgba(0, 229, 176, 0.15)" : "rgba(255, 255, 255, 0.06)",
+          }}
+        />
+      )}
+
+      <div className="relative z-10 flex items-center justify-between gap-3">
+        <span className={`text-[14px] font-sans ${isUserChoice ? "text-[#00e5b0]" : "text-[#efeff1]"}`}>
+          {label}
+        </span>
+        {isVoted && (
+          <span className={`text-[12px] font-mono tabular-nums shrink-0 ${isUserChoice ? "text-[#00e5b0]" : "text-[#7a7a8a]"}`}>
+            {percentage}%{isUserChoice ? " ✓" : ""}
+          </span>
+        )}
+      </div>
+    </button>
+  )
+}
+
+function PollView({ content, frameKey, activePoll, onVote }: {
+  content: BroadcastFrame["content"]
+  frameKey: string | number
+  activePoll: ActivePoll | null
+  onVote: (pollId: string, optionIndex: number) => void
+}) {
+  const question = content.question || ""
+  const options = content.options || []
+  const pollId = content.poll_id || ""
+  const results = activePoll?.results || new Array(options.length).fill(0)
+  const totalVotes = results.reduce((a: number, b: number) => a + b, 0)
+  const isVoted = activePoll?.voted || false
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter w-full max-w-[500px] px-6">
+        {/* Question */}
+        <h2 className="text-[clamp(18px,3vw,24px)] font-sans font-semibold text-[#efeff1] text-center mb-6 leading-tight">
+          {question}
+        </h2>
+
+        {/* Options */}
+        <div className="flex flex-col gap-2">
+          {options.map((opt, i) => (
+            <PollOption
+              key={i}
+              label={opt}
+              index={i}
+              total={totalVotes}
+              percentage={totalVotes > 0 ? Math.round((results[i] / totalVotes) * 100) : 0}
+              isVoted={isVoted}
+              isUserChoice={activePoll?.votedIndex === i}
+              onVote={() => onVote(pollId, i)}
+            />
+          ))}
+        </div>
+
+        {/* Vote count */}
+        <p className="text-[11px] font-mono text-[#7a7a8a] text-center mt-4">
+          {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Duet Turn Bubble ──
 
 function DuetTurnBubble({ speakerName, speakerRole, text, isCurrent, animateIn }: {
@@ -291,7 +413,7 @@ function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }:
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="flex-1 flex flex-col justify-end px-8 py-10 gap-4 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center px-8 py-10 gap-4 overflow-y-auto">
         {/* Duet header */}
         <div className="max-w-[600px] w-full mx-auto">
           <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#7a7a8a]">
@@ -346,7 +468,7 @@ function IdleView() {
 
 function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
   if (!frame) return undefined
-  if (frame.type === "data" || frame.type === "terminal") return "#0e0e10"
+  if (frame.type === "data" || frame.type === "terminal" || frame.type === "image" || frame.type === "poll") return "#0e0e10"
   if (frame.type === "duet") return undefined // duets use default dark bg
   if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"
@@ -363,6 +485,7 @@ function renderFrame(
   buffer: string,
   frameKey: string | number,
   duetContext?: { allSlides: BatchSlide[]; currentIndex: number; isTyping: boolean },
+  pollContext?: { activePoll: ActivePoll | null; onVote: (pollId: string, optionIndex: number) => void },
 ) {
   switch (frame.type) {
     case "terminal":
@@ -371,6 +494,17 @@ function renderFrame(
       return <TextView content={frame.content} frameKey={frameKey} />
     case "data":
       return <DataView content={frame.content} />
+    case "image":
+      return <ImageView content={frame.content} frameKey={frameKey} />
+    case "poll":
+      return (
+        <PollView
+          content={frame.content}
+          frameKey={frameKey}
+          activePoll={pollContext?.activePoll ?? null}
+          onVote={pollContext?.onVote ?? (() => {})}
+        />
+      )
     case "duet":
       return (
         <DuetSlideView
@@ -427,6 +561,7 @@ export default function Broadcast() {
   const {
     isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo,
     isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
+    activePoll, vote, duetNotification,
   } = useBroadcastContext()
 
   // Frame key for entrance animations
@@ -435,12 +570,18 @@ export default function Broadcast() {
   // Viewport background from current frame
   const viewportBg = getFrameBgColor(latestFrame)
 
-  // Check if current slide is a duet (for info bar label)
+  // Check if current slide is a duet or poll (for info bar label)
   const isDuetSlide = isBatchPlaying && batchSlides[batchIndex]?.type === "duet"
+  const isPollSlide = latestFrame?.type === "poll"
 
   // Build duet context for the renderer
   const duetContext = isDuetSlide
     ? { allSlides: batchSlides, currentIndex: batchIndex, isTyping: isDuetTyping }
+    : undefined
+
+  // Build poll context for the renderer
+  const pollContext = isPollSlide
+    ? { activePoll, onVote: vote }
     : undefined
 
   // Decide what to show in the info bar
@@ -466,7 +607,7 @@ export default function Broadcast() {
         <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
           {displayName ? (
             <>
-              <span>{isDuetSlide ? "Duet" : "Live now"}</span>
+              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : "Live now"}</span>
               <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
                 {displayName}
               </span>
@@ -506,7 +647,7 @@ export default function Broadcast() {
       >
 
         {latestFrame ? (
-          renderFrame(latestFrame, terminalBuffer, frameKey, duetContext)
+          renderFrame(latestFrame, terminalBuffer, frameKey, duetContext, pollContext)
         ) : (
           <IdleView />
         )}
@@ -514,6 +655,17 @@ export default function Broadcast() {
         {/* Batch progress bars */}
         {isBatchPlaying && batchSlides.length > 0 && (
           <BatchProgressBars slides={batchSlides} currentIndex={batchIndex} />
+        )}
+
+        {/* Duet negotiation toast */}
+        {duetNotification && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 text-view-enter">
+            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#1a1a1f]/95 border border-[#00e5b0]/30 backdrop-blur-sm shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-[#00e5b0] animate-pulse shrink-0" />
+              <span className="text-[12px] font-mono font-semibold text-[#00e5b0]">{duetNotification.name}</span>
+              <span className="text-[12px] font-sans text-[#adadb8]">{duetNotification.text}</span>
+            </div>
+          </div>
         )}
       </div>
     </section>

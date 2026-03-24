@@ -14,6 +14,8 @@ export interface BroadcastFrame {
     body?: string
     meta?: string
     rows?: Array<{ label: string; value: string; change?: string }>
+    // Data table style
+    data_style?: "default" | "ticker" | "chalk" | "ledger"
     widget_url?: string
     widget_type?: string
     // Text themes + overrides

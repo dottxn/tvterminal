@@ -36,7 +36,7 @@ const TEXT_THEMES = {
     textAlign: "center" as const,
     padding: "p-10",
     glow: false,
-    decor: null as "underline" | "bar" | "quotes" | "dot" | null,
+    decor: null as null,
     bodyPrefix: "",
   },
   // High-impact poster — Bebas Neue headlines, Geist body
@@ -57,7 +57,7 @@ const TEXT_THEMES = {
     textAlign: "center" as const,
     padding: "px-8 py-10",
     glow: false,
-    decor: "bar" as const,
+    decor: null as null,
     bodyPrefix: "",
   },
   // Cyberpunk terminal — Space Mono, glowing neon
@@ -99,7 +99,7 @@ const TEXT_THEMES = {
     textAlign: "left" as const,
     padding: "pl-12 pr-8 py-10",
     glow: false,
-    decor: "quotes" as const,
+    decor: null as null,
     bodyPrefix: "",
   },
   // Hacker console — Geist Mono, green phosphor
@@ -141,7 +141,7 @@ const TEXT_THEMES = {
     textAlign: "center" as const,
     padding: "px-12 py-10",
     glow: false,
-    decor: "dot" as const,
+    decor: null as null,
     bodyPrefix: "",
   },
   // Geometric lo-fi — Syne headlines, Geist Mono body
@@ -162,7 +162,7 @@ const TEXT_THEMES = {
     textAlign: "left" as const,
     padding: "pl-10 pr-8 py-10",
     glow: false,
-    decor: "underline" as const,
+    decor: null as null,
     bodyPrefix: "",
   },
   // ── Layout-breaking themes (custom renderers) ──
@@ -300,11 +300,6 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
       )}
 
       <div key={frameKey} className="text-view-enter relative z-10 max-w-[700px]">
-        {/* Quote decoration */}
-        {theme.decor === "quotes" && content.headline && (
-          <span className="text-[72px] leading-none opacity-20 block -mb-6" style={{ color: headlineColor, fontFamily: "Georgia, serif" }}>{"\u201C"}</span>
-        )}
-
         {content.headline && (
           <h2
             className={`${theme.headlineSize} ${theme.headlineFont} ${theme.headlineWeight} ${theme.headlineTransform} ${theme.headlineTracking} ${theme.headlineStyle} leading-[1.1] mb-4`}
@@ -315,21 +310,6 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
           >
             {content.headline}
           </h2>
-        )}
-
-        {/* Thin underline accent */}
-        {theme.decor === "underline" && content.headline && (
-          <span className="block mb-5 h-[3px] w-16 rounded-full" style={{ backgroundColor: headlineColor, ...(isLeft ? {} : { margin: "0 auto 20px" }) }} />
-        )}
-
-        {/* Thick bar accent */}
-        {theme.decor === "bar" && content.headline && (
-          <span className="block mb-5 h-[4px] w-24" style={{ backgroundColor: headlineColor, ...(isLeft ? {} : { margin: "0 auto 20px" }) }} />
-        )}
-
-        {/* Center dot divider */}
-        {theme.decor === "dot" && content.headline && (
-          <span className="block mb-5 w-2 h-2 rounded-full opacity-40" style={{ backgroundColor: headlineColor, ...(isLeft ? {} : { margin: "0 auto 20px" }) }} />
         )}
 
         {(content.body || content.text) && (
@@ -359,9 +339,10 @@ function MemeLayout({ content, frameKey }: { content: BroadcastFrame["content"];
   const topText = content.headline || ""
   const bottomText = content.body || content.text || ""
 
-  // Meme text style: white with heavy black stroke/shadow
+  // Meme text style: white (or custom color) with heavy black stroke/shadow
+  const textColor = validHex(content.text_color) || "#ffffff"
   const memeTextStyle = {
-    color: "#ffffff",
+    color: textColor,
     textShadow: "2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000",
     WebkitTextStroke: "1px #000",
   } as const
@@ -620,8 +601,79 @@ function ResearchLayout({ content, frameKey }: { content: BroadcastFrame["conten
 }
 
 function DataView({ content }: { content: BroadcastFrame["content"] }) {
+  const style = content.data_style || "default"
+  const bgColor = content.bg_color || "#0e0e10"
+
+  // ── Ticker: horizontal scrolling LED-style ──
+  if (style === "ticker") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
+        <div className="flex flex-col gap-4 p-6 w-full max-w-[560px]">
+          {content.rows?.map((row, i) => (
+            <div key={i} className="flex justify-between items-center py-3 px-4 rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+              <span className="text-[11px] font-display-space uppercase tracking-[0.15em] text-[#7a7a8a]">{row.label}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[20px] font-display-bebas tracking-wide text-[#efeff1] tabular-nums">{row.value}</span>
+                {row.change && (
+                  <span className={`text-[11px] font-display-space px-2 py-0.5 rounded-sm ${row.change.startsWith("+") ? "text-[#00c853] bg-[#00c853]/10" : "text-[#e91916] bg-[#e91916]/10"}`}>
+                    {row.change}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Chalk: hand-rendered feel, rough, educational ──
+  if (style === "chalk") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#1a2a1a" : bgColor }}>
+        <div className="flex flex-col gap-3 p-8 w-full max-w-[520px]">
+          {content.rows?.map((row, i) => (
+            <div key={i} className="flex justify-between items-baseline py-2" style={{ borderBottom: "1px dashed rgba(255,255,255,0.15)" }}>
+              <span className="text-[14px] font-display-space text-[#a8c8a8]">{row.label}</span>
+              <div className="flex items-baseline gap-3">
+                <span className="text-[18px] font-display-syne font-bold text-[#e8e8d0]">{row.value}</span>
+                {row.change && (
+                  <span className="text-[12px] font-display-space text-[#d4a854]">{row.change}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Ledger: clean accounting/spreadsheet feel ──
+  if (style === "ledger") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#f5f0e8" : bgColor }}>
+        <div className="flex flex-col p-8 w-full max-w-[520px]">
+          {content.rows?.map((row, i) => (
+            <div key={i} className={`flex justify-between items-baseline py-3 px-3 ${i % 2 === 0 ? "" : ""}`} style={{ backgroundColor: i % 2 === 0 ? "rgba(0,0,0,0.03)" : "transparent", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+              <span className="text-[13px] font-display-serif text-[#4a4a40]">{row.label}</span>
+              <div className="flex items-baseline gap-3">
+                <span className="text-[15px] font-mono text-[#1a1a18] tabular-nums font-medium">{row.value}</span>
+                {row.change && (
+                  <span className={`text-[11px] font-mono ${row.change.startsWith("+") ? "text-[#2d7d3a]" : "text-[#9b2c2c]"}`}>
+                    {row.change}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Default ──
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
     <div className="flex flex-col gap-2 p-6 w-full max-w-[500px]">
       {content.rows?.map((row, i) => (
         <div key={i} className="flex justify-between items-baseline py-2 border-b border-[#2a2a35]">
@@ -925,7 +977,13 @@ function IdleView() {
 
 function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
   if (!frame) return undefined
-  if (frame.type === "data" || frame.type === "terminal" || frame.type === "image" || frame.type === "poll") return "#0e0e10"
+  if (frame.type === "data") {
+    const style = frame.content.data_style || "default"
+    if (style === "ledger") return validHex(frame.content.bg_color) || "#f5f0e8"
+    if (style === "chalk") return validHex(frame.content.bg_color) || "#1a2a1a"
+    return validHex(frame.content.bg_color) || "#0e0e10"
+  }
+  if (frame.type === "terminal" || frame.type === "image" || frame.type === "poll") return "#0e0e10"
   if (frame.type === "duet") return undefined // duets use default dark bg
   if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"

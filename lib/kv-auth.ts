@@ -128,15 +128,21 @@ export async function getAgentStats(streamerName: string): Promise<AgentStats | 
   const key = `tvt:agent_stats:${streamerName}`
 
   // Try HASH format first (new schema)
-  const hash = await r.hgetall<Record<string, string>>(key)
-  if (hash && Object.keys(hash).length > 0) {
-    return {
-      total_broadcasts: Number(hash.total_broadcasts) || 0,
-      total_slides: Number(hash.total_slides) || 0,
-      last_seen: hash.last_seen || "",
-      peak_viewers: Number(hash.peak_viewers) || 0,
-      total_votes: Number(hash.total_votes) || 0,
+  // Wrapped in try/catch because HGETALL throws WRONGTYPE if the key
+  // is still stored as a JSON string (legacy format pre-migration).
+  try {
+    const hash = await r.hgetall<Record<string, string>>(key)
+    if (hash && Object.keys(hash).length > 0) {
+      return {
+        total_broadcasts: Number(hash.total_broadcasts) || 0,
+        total_slides: Number(hash.total_slides) || 0,
+        last_seen: hash.last_seen || "",
+        peak_viewers: Number(hash.peak_viewers) || 0,
+        total_votes: Number(hash.total_votes) || 0,
+      }
     }
+  } catch {
+    // WRONGTYPE — key exists as a string, fall through to legacy path
   }
 
   // Fallback: try legacy JSON string format
@@ -146,17 +152,52 @@ export async function getAgentStats(streamerName: string): Promise<AgentStats | 
 }
 
 /**
+ * Migrate a legacy JSON string agent_stats key to a HASH in-place.
+ * Returns the parsed stats if migration happened, null if key was already a HASH or missing.
+ */
+async function migrateStatsToHash(r: Redis, key: string): Promise<AgentStats | null> {
+  try {
+    const data = await r.get<string>(key)
+    if (!data) return null
+    const parsed: AgentStats = typeof data === "string" ? JSON.parse(data) : data
+    // Delete the string key, then write as HASH
+    await r.del(key)
+    await r.hset(key, {
+      total_broadcasts: parsed.total_broadcasts ?? 0,
+      total_slides: parsed.total_slides ?? 0,
+      last_seen: parsed.last_seen ?? "",
+      peak_viewers: parsed.peak_viewers ?? 0,
+      total_votes: parsed.total_votes ?? 0,
+    })
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/**
  * Atomically increment broadcast + slide counters via HINCRBY.
  * No read-modify-write race — each op is atomic.
+ * Auto-migrates legacy JSON string keys to HASH on first write.
  */
 export async function incrementAgentStats(streamerName: string, slideCount: number): Promise<void> {
   const r = getRedis()
   const key = `tvt:agent_stats:${streamerName}`
-  const pipeline = r.pipeline()
-  pipeline.hincrby(key, "total_broadcasts", 1)
-  pipeline.hincrby(key, "total_slides", slideCount)
-  pipeline.hset(key, { last_seen: new Date().toISOString() })
-  await pipeline.exec()
+  try {
+    const pipeline = r.pipeline()
+    pipeline.hincrby(key, "total_broadcasts", 1)
+    pipeline.hincrby(key, "total_slides", slideCount)
+    pipeline.hset(key, { last_seen: new Date().toISOString() })
+    await pipeline.exec()
+  } catch {
+    // WRONGTYPE — legacy string key. Migrate then retry.
+    await migrateStatsToHash(r, key)
+    const pipeline = r.pipeline()
+    pipeline.hincrby(key, "total_broadcasts", 1)
+    pipeline.hincrby(key, "total_slides", slideCount)
+    pipeline.hset(key, { last_seen: new Date().toISOString() })
+    await pipeline.exec()
+  }
 }
 
 /**
@@ -167,15 +208,27 @@ export async function updateAgentStreamStats(streamerName: string, peakViewers: 
   const r = getRedis()
   const key = `tvt:agent_stats:${streamerName}`
 
-  // Atomically add votes
-  if (totalVotes > 0) {
-    await r.hincrby(key, "total_votes", totalVotes)
-  }
+  try {
+    // Atomically add votes
+    if (totalVotes > 0) {
+      await r.hincrby(key, "total_votes", totalVotes)
+    }
 
-  // Peak viewers: read then conditionally set (needs 2 ops — acceptable since endSlot is low-frequency)
-  const currentPeak = Number(await r.hget(key, "peak_viewers")) || 0
-  if (peakViewers > currentPeak) {
-    await r.hset(key, { peak_viewers: peakViewers })
+    // Peak viewers: read then conditionally set (needs 2 ops — acceptable since endSlot is low-frequency)
+    const currentPeak = Number(await r.hget(key, "peak_viewers")) || 0
+    if (peakViewers > currentPeak) {
+      await r.hset(key, { peak_viewers: peakViewers })
+    }
+  } catch {
+    // WRONGTYPE — legacy string key. Migrate then retry.
+    await migrateStatsToHash(r, key)
+    if (totalVotes > 0) {
+      await r.hincrby(key, "total_votes", totalVotes)
+    }
+    const currentPeak = Number(await r.hget(key, "peak_viewers")) || 0
+    if (peakViewers > currentPeak) {
+      await r.hset(key, { peak_viewers: peakViewers })
+    }
   }
 }
 

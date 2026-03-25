@@ -1,23 +1,17 @@
 import { getAuthUser } from "@/lib/auth"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { getValidationErrors, getBroadcastContent } from "@/lib/kv"
-import { Redis } from "@upstash/redis"
+import { getValidationErrors } from "@/lib/kv"
+import { getRedis } from "@/lib/redis"
 import type { BroadcastContentMetadata } from "@/lib/types"
 
 const ADMIN_EMAILS = new Set(
   (process.env.ADMIN_EMAIL || "").split(",").map((e) => e.trim()).filter(Boolean),
 )
 
-let redis: Redis | null = null
-function getRedis(): Redis {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  }
-  return redis
-}
+// ── 30s server-side cache ──
+// Avoids 15+ Redis round-trips on every 30s auto-refresh.
+let cachedResponse: { data: Record<string, unknown>; expires: number } | null = null
+const CACHE_TTL_MS = 30_000
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -28,6 +22,11 @@ export async function GET(req: Request) {
     const user = await getAuthUser(req)
     if (!user || !ADMIN_EMAILS.has(user.email)) {
       return jsonResponse({ ok: false, error: "Unauthorized" }, 401, req)
+    }
+
+    // Return cached response if fresh
+    if (cachedResponse && Date.now() < cachedResponse.expires) {
+      return jsonResponse(cachedResponse.data, 200, req)
     }
 
     const r = getRedis()
@@ -41,12 +40,15 @@ export async function GET(req: Request) {
       if (keys) contentKeys.push(...keys)
     } while (cursor !== 0)
 
-    // Fetch broadcast content metadata
+    // Fetch broadcast content metadata in batches using MGET (fixes N+1)
     const broadcasts: BroadcastContentMetadata[] = []
-    for (const key of contentKeys) {
-      const slotId = key.replace("tvt:broadcast_content:", "")
-      const content = await getBroadcastContent(slotId)
-      if (content) broadcasts.push(content)
+    const BATCH_SIZE = 50
+    for (let i = 0; i < contentKeys.length; i += BATCH_SIZE) {
+      const batch = contentKeys.slice(i, i + BATCH_SIZE)
+      const results = await r.mget<(BroadcastContentMetadata | null)[]>(...batch)
+      for (const result of results) {
+        if (result) broadcasts.push(result)
+      }
     }
 
     // Sort by ended_at desc, take top 20
@@ -68,7 +70,7 @@ export async function GET(req: Request) {
     // Get validation errors
     const validationErrors = await getValidationErrors(50)
 
-    // Get deprecated format counters from Redis
+    // Get deprecated format counters from Redis (also batched via MGET)
     const deprecatedKeys: string[] = []
     let dCursor = 0
     do {
@@ -78,13 +80,16 @@ export async function GET(req: Request) {
     } while (dCursor !== 0)
 
     const deprecatedFormats: Record<string, number> = {}
-    for (const key of deprecatedKeys) {
-      const name = key.replace("tvt:deprecated_format:", "")
-      const count = await r.get<number>(key)
-      if (count) deprecatedFormats[name] = count
+    if (deprecatedKeys.length > 0) {
+      const counts = await r.mget<(number | null)[]>(...deprecatedKeys)
+      for (let i = 0; i < deprecatedKeys.length; i++) {
+        const name = deprecatedKeys[i].replace("tvt:deprecated_format:", "")
+        const count = counts[i]
+        if (count) deprecatedFormats[name] = count
+      }
     }
 
-    return jsonResponse({
+    const data = {
       ok: true,
       recent_broadcasts: recentBroadcasts,
       validation_errors: validationErrors,
@@ -92,7 +97,12 @@ export async function GET(req: Request) {
       theme_stats: themeStats,
       deprecated_formats: deprecatedFormats,
       total_broadcasts: broadcasts.length,
-    }, 200, req)
+    }
+
+    // Cache the response
+    cachedResponse = { data, expires: Date.now() + CACHE_TTL_MS }
+
+    return jsonResponse(data, 200, req)
   } catch (err) {
     console.error("[admin/insights]", err)
     return jsonResponse(

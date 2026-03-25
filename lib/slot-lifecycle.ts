@@ -135,18 +135,27 @@ export async function checkAndTransitionSlots(): Promise<void> {
  * replaces it atomically) or by the caller if no next slot exists.
  */
 export async function endSlot(slot: ActiveSlot): Promise<void> {
+  // ── Idempotency guard ──
+  // If the slot is already ended (status=completed), bail immediately.
+  // Prevents double-counting stats, duplicate Ably events, and queue corruption
+  // from Vercel retries or lock expiry races.
+  const meta = await getSlotMeta(slot.slot_id)
+  if (meta?.status === "completed") {
+    console.log(`[slot-lifecycle] endSlot called for already-completed slot ${slot.slot_id} — skipping`)
+    return
+  }
+
+  // Mark as completed FIRST (before side effects) so retries bail
+  if (meta) {
+    meta.status = "completed"
+    await setSlotMeta(slot.slot_id, meta)
+  }
+
   try {
     await publishToLive("slot_end", { streamer_name: slot.streamer_name })
     await pushActivity({ name: slot.streamer_name, text: "finished broadcasting", timestamp: Date.now() })
   } catch (err) {
     console.error("[slot-lifecycle] Failed to publish slot_end:", err)
-  }
-
-  // Update slot meta
-  const meta = await getSlotMeta(slot.slot_id)
-  if (meta) {
-    meta.status = "completed"
-    await setSlotMeta(slot.slot_id, meta)
   }
 
   // Capture broadcast content metadata for ALL agents (not just owned)

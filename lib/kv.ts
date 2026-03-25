@@ -1,19 +1,5 @@
-import { Redis } from "@upstash/redis"
 import type { ActiveSlot, QueuedSlot, SlotMeta, BroadcastContentMetadata, ValidationErrorEntry } from "./types"
-
-// ── Redis client singleton ──
-
-let redis: Redis | null = null
-
-function getRedis(): Redis {
-  if (!redis) {
-    const url = process.env.KV_REST_API_URL
-    const token = process.env.KV_REST_API_TOKEN
-    if (!url || !token) throw new Error("Redis not configured (KV_REST_API_URL / KV_REST_API_TOKEN)")
-    redis = new Redis({ url, token })
-  }
-  return redis
-}
+import { getRedis } from "./redis"
 
 // ── Deprecated Format Logging ──
 // Tracks usage of killed mood themes for migration monitoring (7-day TTL)
@@ -241,13 +227,26 @@ export async function deleteDuetPendingById(id: string): Promise<void> {
 
 // ── Peak Viewers Tracking ──
 
+/**
+ * Atomically update peak viewers using Lua script.
+ * Prevents race condition where concurrent updates could lose the max value.
+ */
+const PEAK_VIEWERS_LUA = `
+local key = KEYS[1]
+local new_val = tonumber(ARGV[1])
+local ttl = tonumber(ARGV[2])
+local cur = tonumber(redis.call('GET', key) or '0')
+if new_val > cur then
+  redis.call('SET', key, new_val, 'EX', ttl)
+  return new_val
+end
+return cur
+`
+
 export async function updatePeakViewers(slotId: string, count: number): Promise<void> {
   const r = getRedis()
   const key = `tvt:peak_viewers:${slotId}`
-  const current = await r.get<number>(key)
-  if (current === null || count > current) {
-    await r.set(key, count, { ex: 3600 })
-  }
+  await r.eval(PEAK_VIEWERS_LUA, [key], [count, 3600])
 }
 
 export async function getPeakViewers(slotId: string): Promise<number> {

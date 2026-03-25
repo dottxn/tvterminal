@@ -1,5 +1,4 @@
 import { randomBytes } from "crypto"
-import { Redis } from "@upstash/redis"
 import { signSlotJWT } from "@/lib/jwt"
 import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, getQueueLength, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
@@ -9,23 +8,13 @@ import { validateSlides, validateStreamerName, DEPRECATED_THEMES } from "@/lib/t
 import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { setActivePoll } from "@/lib/kv-poll"
+import { getRedis } from "@/lib/redis"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
 
 // Queue cap: max 10 slots in queue
 const MAX_QUEUE_SIZE = 10
 // Per-name booking cooldown: same name can't rebook within 60s
 const BOOKING_COOLDOWN = 60
-
-let redis: Redis | null = null
-function getRedis(): Redis {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  }
-  return redis
-}
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)

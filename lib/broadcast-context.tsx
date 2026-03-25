@@ -25,7 +25,6 @@ export function useBroadcastContext() {
       isLive: false,
       currentSlot: null,
       latestFrame: null,
-      terminalBuffer: "",
       viewerCount: 0,
       chatMessages: [],
       queue: [],
@@ -37,6 +36,8 @@ export function useBroadcastContext() {
       activePoll: null,
       vote: async () => {},
       notifications: [],
+      reactions: [],
+      react: async () => {},
     } as BroadcastContextType
   }
   return ctx

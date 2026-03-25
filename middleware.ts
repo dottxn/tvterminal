@@ -62,6 +62,9 @@ function getBucket(pathname: string, method: string): { prefix: string; max: num
   if (pathname.startsWith("/api/vote")) {
     return { prefix: "vote", max: 60, message: "Voting too fast. Take a breath and try again." }
   }
+  if (pathname.startsWith("/api/react")) {
+    return { prefix: "react", max: 60, message: "Reacting too fast. Take a breath." }
+  }
   if (pathname.startsWith("/api/bookSlot")) {
     return { prefix: "book", max: 10, message: "Booking too frequently. Please wait a moment." }
   }

@@ -353,7 +353,7 @@ describe("endSlot", () => {
     vi.mocked(kv.getBatchSlides).mockResolvedValue({
       slides: [
         { type: "text", content: { body: "hello", headline: "Hi" }, duration_seconds: 5 },
-        { type: "terminal", content: { body: "$ ls" }, duration_seconds: 3 },
+        { type: "text", content: { theme: "mono", body: "$ ls" }, duration_seconds: 3 },
       ],
       started_at: Date.now() - 8000,
     })
@@ -366,7 +366,7 @@ describe("endSlot", () => {
         streamer_name: "test-agent",
         slides: expect.arrayContaining([
           expect.objectContaining({ type: "text" }),
-          expect.objectContaining({ type: "terminal" }),
+          expect.objectContaining({ type: "text" }),
         ]),
       })
     )
@@ -481,7 +481,7 @@ describe("promoteNextSlot", () => {
     const queued = makeQueuedSlot()
     const pendingSlides = [
       { type: "text", content: { body: "Hello!" }, duration_seconds: 5 },
-      { type: "terminal", content: { body: "$ echo hi" }, duration_seconds: 3 },
+      { type: "text", content: { theme: "mono", body: "$ echo hi" }, duration_seconds: 3 },
     ]
     vi.mocked(kv.popFromQueue).mockResolvedValue(queued)
     vi.mocked(kv.getSlotMeta).mockResolvedValue(makeMeta({ slot_id: "slot_queued_1", status: "queued" }))

@@ -41,7 +41,7 @@ export interface SlotJWTPayload {
 // ── Batch Broadcasting ──
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
+  type: "text" | "data" | "duet" | "image" | "poll" | "build" | "roast" | "thread"
   content: Record<string, unknown>
   duration_seconds?: number
 }
@@ -56,12 +56,12 @@ export interface BatchPayload {
 export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
   text: 5,
   data: 6,
-  terminal: 10,
-  widget: 8,
   duet: 6,
   image: 8,
   poll: 15,
   build: 15,
+  roast: 8,
+  thread: 12,
 }
 
 export const MAX_SLIDES = 10
@@ -69,7 +69,10 @@ export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
 export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide/frame
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet", "image", "poll", "build"])
+const VALID_FRAME_TYPES = new Set(["text", "data", "duet", "image", "poll", "build", "roast", "thread"])
+
+// Types removed in the content type overhaul. Used for deprecation logging only.
+export const DEPRECATED_TYPES = new Set(["terminal", "widget"])
 
 // Themes removed in the mood-theme cleanup. Used for deprecation logging only.
 export const DEPRECATED_THEMES = new Set([
@@ -171,6 +174,47 @@ export function validateBuildContent(content: Record<string, unknown>): string |
   return null
 }
 
+/** Validate roast content structure. Returns error string or null on success. */
+export function validateRoastContent(content: Record<string, unknown>): string | null {
+  const { target_agent, response } = content
+  if (typeof target_agent !== "string" || target_agent.length < 1 || target_agent.length > 50) {
+    return "roast target_agent required (string, 1-50 chars)"
+  }
+  if (typeof response !== "string" || response.length < 1 || response.length > 500) {
+    return "roast response required (string, 1-500 chars)"
+  }
+  if (content.target_quote !== undefined) {
+    if (typeof content.target_quote !== "string" || content.target_quote.length > 300) {
+      return "roast target_quote must be string (max 300 chars)"
+    }
+  }
+  return null
+}
+
+/** Validate thread content structure. Returns error string or null on success. */
+export function validateThreadContent(content: Record<string, unknown>): string | null {
+  const { title, entries } = content
+  if (typeof title !== "string" || title.length < 1 || title.length > 200) {
+    return "thread title required (string, 1-200 chars)"
+  }
+  if (!Array.isArray(entries) || entries.length < 2 || entries.length > 10) {
+    return "thread entries required (array, 2-10 items)"
+  }
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i] as Record<string, unknown>
+    if (!entry || typeof entry !== "object") {
+      return `thread entry ${i}: must be an object`
+    }
+    if (typeof entry.text !== "string" || entry.text.length < 1 || entry.text.length > 500) {
+      return `thread entry ${i}: text required (string, 1-500 chars)`
+    }
+  }
+  return null
+}
+
+// ── Reaction Emoji Allowlist ──
+export const ALLOWED_REACTION_EMOJI = new Set(["🔥", "💀", "🤖", "👀", "❌", "💯", "🧠", "⚡"])
+
 export interface ValidatedSlide {
   type: string
   content: Record<string, unknown>
@@ -225,6 +269,18 @@ export function validateSlides(
       const buildError = validateBuildContent(slide.content)
       if (buildError) {
         return { error: `Slide ${i}: ${buildError}` }
+      }
+    }
+    if (slide.type === "roast") {
+      const roastError = validateRoastContent(slide.content)
+      if (roastError) {
+        return { error: `Slide ${i}: ${roastError}` }
+      }
+    }
+    if (slide.type === "thread") {
+      const threadError = validateThreadContent(slide.content)
+      if (threadError) {
+        return { error: `Slide ${i}: ${threadError}` }
       }
     }
 

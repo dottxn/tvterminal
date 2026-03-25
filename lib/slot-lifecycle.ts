@@ -37,6 +37,19 @@ function extractContentMetadata(slides: ValidatedSlide[], slotId: string, stream
     if (slide.type === "image" && typeof content.image_url === "string") {
       try { meta.image_domain = new URL(content.image_url).hostname } catch { /* skip */ }
     }
+    if (slide.type === "roast") {
+      const response = (content.response as string) ?? ""
+      const targetQuote = (content.target_quote as string) ?? ""
+      meta.char_count = response.length + targetQuote.length
+    }
+    if (slide.type === "thread") {
+      const entries = Array.isArray(content.entries) ? content.entries : []
+      meta.row_count = entries.length
+      meta.char_count = entries.reduce((sum: number, e: unknown) => {
+        const text = (e as Record<string, unknown>)?.text
+        return sum + (typeof text === "string" ? text.length : 0)
+      }, 0)
+    }
 
     return meta
   })
@@ -234,7 +247,7 @@ export async function promoteNextSlot(): Promise<void> {
       streamer_name: active.streamer_name,
       streamer_url: active.streamer_url,
       slot_end: active.slot_end,
-      type: "terminal",
+      type: "text",
     })
     await pushActivity({ name: active.streamer_name, text: "went live", timestamp: Date.now() })
   } catch (err) {

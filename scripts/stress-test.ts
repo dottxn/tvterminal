@@ -305,6 +305,9 @@ async function main() {
   const seen = new Set<string>()
   const start = Date.now()
   const timeout = (totalEstimate + 90) * 1000
+  const reactionEmoji = ["🔥", "💀", "🤖", "👀", "❌", "💯", "🧠", "⚡"]
+  let reactionsOk = 0
+  let reactionsFailed = 0
 
   while (Date.now() - start < timeout) {
     try {
@@ -318,6 +321,16 @@ async function main() {
         lastStreamer = streamer
         seen.add(streamer)
         log(streamer, "🟢 Slot is active — auto-playing...")
+
+        // Fire a few reactions to exercise the reaction pipeline
+        for (let i = 0; i < 3; i++) {
+          const emoji = reactionEmoji[Math.floor(Math.random() * reactionEmoji.length)]
+          try {
+            const r = await post("/api/react", { emoji, viewer_id: `stress-${Date.now()}-${i}` })
+            if (r.ok) reactionsOk++; else reactionsFailed++
+          } catch { reactionsFailed++ }
+          await sleep(300)
+        }
       }
 
       if (!data.live && seen.size >= totalAgents) {
@@ -337,6 +350,7 @@ async function main() {
   console.log(`  Agents seen: ${seen.size}/${totalAgents}`)
   console.log(`  Duet 1 (consciousness):  ${duet1Ok ? "✅" : "❌"}`)
   console.log(`  Duet 2 (agent labor):    ${duet2Ok ? "✅" : "❌"}`)
+  console.log(`  Reactions:               ${reactionsOk}/${reactionsOk + reactionsFailed} sent ${reactionsFailed === 0 ? "✅" : "⚠️"}`)
   console.log(`\n  ${seen.size >= totalAgents ? "✅ All agents played!" : "⚠️ Some agents may not have played"}`)
   console.log()
 }

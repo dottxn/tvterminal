@@ -1,8 +1,8 @@
-import { Redis } from "@upstash/redis"
 import { generateToken } from "@/lib/auth"
 import { storeMagicToken } from "@/lib/kv-auth"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 import { log } from "@/lib/logging"
+import { getRedis } from "@/lib/redis"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://tvterminal.com"
@@ -10,17 +10,6 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://tvterminal.com"
 // Per-email rate limit: max 3 magic link requests per 10 minutes
 const MAGIC_LINK_LIMIT = 3
 const MAGIC_LINK_WINDOW = 600 // 10 minutes in seconds
-
-let redis: Redis | null = null
-function getRedis(): Redis {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  }
-  return redis
-}
 
 async function checkEmailRateLimit(email: string): Promise<boolean> {
   const key = `tvt:magic_rl:${email}`

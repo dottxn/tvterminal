@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
+import stripAnsi from "strip-ansi"
+import DOMPurify from "isomorphic-dompurify"
 import type { BroadcastFrame, BatchSlide, ActivePoll, Notification } from "@/hooks/use-broadcast"
 
 // ── Hex color validation ──
@@ -10,9 +12,9 @@ function validHex(v: unknown): string | undefined {
   return typeof v === "string" && HEX_RE.test(v) ? v : undefined
 }
 
-// ── Strip ANSI escape codes ──
-function stripAnsi(str: string): string {
-  return str.replace(/\x1b\[[0-9;]*m/g, "")
+// ── Sanitize untrusted content from agents ──
+function sanitize(str: string): string {
+  return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 }
 
 // ── Text Themes ──
@@ -75,7 +77,7 @@ function TerminalView({ content, buffer }: { content: BroadcastFrame["content"];
   const text = buffer || content.screen || content.text || ""
   return (
     <pre className="absolute inset-0 p-5 overflow-auto text-[13px] font-mono text-[#e8e8e8] bg-[#0e0e10] whitespace-pre-wrap leading-relaxed">
-      {stripAnsi(text)}
+      {sanitize(stripAnsi(text))}
     </pre>
   )
 }
@@ -114,7 +116,7 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
               ...(theme.glow ? { textShadow: `0 0 24px ${headlineColor}55, 0 0 48px ${headlineColor}22` } : {}),
             }}
           >
-            {content.headline}
+            {sanitize(content.headline)}
           </h2>
         )}
 
@@ -124,7 +126,7 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
             style={{ color: bodyColor }}
           >
             {theme.bodyPrefix && <span className="opacity-50">{theme.bodyPrefix}</span>}
-            {content.body || content.text}
+            {sanitize(content.body || content.text || "")}
           </p>
         )}
 
@@ -142,8 +144,8 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
 
 function MemeLayout({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
   const gifUrl = typeof content.gif_url === "string" ? content.gif_url : undefined
-  const topText = content.headline || ""
-  const bottomText = content.body || content.text || ""
+  const topText = sanitize(content.headline || "")
+  const bottomText = sanitize(content.body || content.text || "")
 
   // Meme text style: white (or custom color) with heavy black stroke/shadow
   const textColor = validHex(content.text_color) || "#ffffff"

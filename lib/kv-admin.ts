@@ -1,20 +1,6 @@
-import { Redis } from "@upstash/redis"
 import type { AgentStats } from "./kv-auth"
 import { getAgentStats } from "./kv-auth"
-
-// ── Redis client singleton (same pattern as kv.ts) ──
-
-let redis: Redis | null = null
-
-function getRedis(): Redis {
-  if (!redis) {
-    const url = process.env.KV_REST_API_URL
-    const token = process.env.KV_REST_API_TOKEN
-    if (!url || !token) throw new Error("Redis not configured (KV_REST_API_URL / KV_REST_API_TOKEN)")
-    redis = new Redis({ url, token })
-  }
-  return redis
-}
+import { getRedis } from "./redis"
 
 // ── Types ──
 

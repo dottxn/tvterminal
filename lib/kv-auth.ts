@@ -1,20 +1,7 @@
 import { Redis } from "@upstash/redis"
 import { hashToken } from "./auth"
+import { getRedis } from "./redis"
 import type { BroadcastSummary } from "./types"
-
-// ── Redis client singleton (same pattern as lib/kv.ts) ──
-
-let redis: Redis | null = null
-
-function getRedis(): Redis {
-  if (!redis) {
-    const url = process.env.KV_REST_API_URL
-    const token = process.env.KV_REST_API_TOKEN
-    if (!url || !token) throw new Error("Redis not configured (KV_REST_API_URL / KV_REST_API_TOKEN)")
-    redis = new Redis({ url, token })
-  }
-  return redis
-}
 
 // ── Types ──
 
@@ -152,26 +139,31 @@ export async function getAgentStats(streamerName: string): Promise<AgentStats | 
 }
 
 /**
- * Migrate a legacy JSON string agent_stats key to a HASH in-place.
- * Returns the parsed stats if migration happened, null if key was already a HASH or missing.
+ * Atomically migrate a legacy JSON string agent_stats key to a HASH.
+ * Uses Lua script to prevent data loss if process crashes mid-migration.
  */
-async function migrateStatsToHash(r: Redis, key: string): Promise<AgentStats | null> {
+const MIGRATE_STATS_LUA = `
+local key = KEYS[1]
+local val = redis.call('GET', key)
+if val == nil or val == false then return 0 end
+local ok, data = pcall(cjson.decode, val)
+if not ok then return 0 end
+redis.call('DEL', key)
+redis.call('HSET', key,
+  'total_broadcasts', tonumber(data.total_broadcasts) or 0,
+  'total_slides', tonumber(data.total_slides) or 0,
+  'last_seen', data.last_seen or '',
+  'peak_viewers', tonumber(data.peak_viewers) or 0,
+  'total_votes', tonumber(data.total_votes) or 0)
+return 1
+`
+
+async function migrateStatsToHash(r: Redis, key: string): Promise<boolean> {
   try {
-    const data = await r.get<string>(key)
-    if (!data) return null
-    const parsed: AgentStats = typeof data === "string" ? JSON.parse(data) : data
-    // Delete the string key, then write as HASH
-    await r.del(key)
-    await r.hset(key, {
-      total_broadcasts: parsed.total_broadcasts ?? 0,
-      total_slides: parsed.total_slides ?? 0,
-      last_seen: parsed.last_seen ?? "",
-      peak_viewers: parsed.peak_viewers ?? 0,
-      total_votes: parsed.total_votes ?? 0,
-    })
-    return parsed
+    const result = await r.eval(MIGRATE_STATS_LUA, [key], [])
+    return result === 1
   } catch {
-    return null
+    return false
   }
 }
 
@@ -204,31 +196,34 @@ export async function incrementAgentStats(streamerName: string, slideCount: numb
  * Atomically update peak viewers (max) and total votes (sum) after a broadcast.
  * Uses a pipeline: read current peak, then conditionally set if new peak is higher.
  */
+/**
+ * Atomically update peak viewers in a HASH using Lua.
+ * Prevents race condition where concurrent calls lose the max value.
+ */
+const HASH_PEAK_LUA = `
+local key = KEYS[1]
+local new_peak = tonumber(ARGV[1])
+local new_votes = tonumber(ARGV[2])
+if new_votes > 0 then
+  redis.call('HINCRBY', key, 'total_votes', new_votes)
+end
+local cur = tonumber(redis.call('HGET', key, 'peak_viewers') or '0')
+if new_peak > cur then
+  redis.call('HSET', key, 'peak_viewers', new_peak)
+end
+return 1
+`
+
 export async function updateAgentStreamStats(streamerName: string, peakViewers: number, totalVotes: number): Promise<void> {
   const r = getRedis()
   const key = `tvt:agent_stats:${streamerName}`
 
   try {
-    // Atomically add votes
-    if (totalVotes > 0) {
-      await r.hincrby(key, "total_votes", totalVotes)
-    }
-
-    // Peak viewers: read then conditionally set (needs 2 ops — acceptable since endSlot is low-frequency)
-    const currentPeak = Number(await r.hget(key, "peak_viewers")) || 0
-    if (peakViewers > currentPeak) {
-      await r.hset(key, { peak_viewers: peakViewers })
-    }
+    await r.eval(HASH_PEAK_LUA, [key], [peakViewers, totalVotes])
   } catch {
     // WRONGTYPE — legacy string key. Migrate then retry.
     await migrateStatsToHash(r, key)
-    if (totalVotes > 0) {
-      await r.hincrby(key, "total_votes", totalVotes)
-    }
-    const currentPeak = Number(await r.hget(key, "peak_viewers")) || 0
-    if (peakViewers > currentPeak) {
-      await r.hset(key, { peak_viewers: peakViewers })
-    }
+    await r.eval(HASH_PEAK_LUA, [key], [peakViewers, totalVotes])
   }
 }
 

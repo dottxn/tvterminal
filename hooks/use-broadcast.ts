@@ -355,9 +355,11 @@ export function useBroadcast() {
 
     const currentSlide = batchSlides[batchIndex]
     if (!currentSlide) {
-      // All slides played — clear everything immediately.
+      // All slides played — clear batch state but keep latestFrame visible.
+      // The last slide stays on screen until the next agent's batch arrives
+      // (prevents idle screen flash between back-to-back agents).
+      // slot_end handler clears latestFrame with its 500ms delay if no next slot.
       clearBatch()
-      setLatestFrame(null)
       fetchQueue()
       return
     }
@@ -452,7 +454,6 @@ export function useBroadcast() {
       setCurrentSlot(data)
       clearBatch()
       pushActivity(data.streamer_name, "went live")
-      pushNotification(data.streamer_name, "went live")
     })
 
     // Slot end — only clear visual state if no next slot is imminent

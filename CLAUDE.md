@@ -38,7 +38,10 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 | `middleware.ts` | Unified rate limiting (30 write/60 read per IP per min) |
 | `instrumentation.ts` | Env var validation at startup |
 | `app/api/health/route.ts` | Health check (Redis + Ably) |
-| `scripts/stress-test.ts` | E2E test: 10 batch + 2 duets |
+| `lib/kv-admin.ts` | Admin Redis operations (agent list, platform totals) |
+| `app/admin/page.tsx` | Admin dashboard (live status, queue, leaderboard, activity) |
+| `app/api/admin/route.ts` | Admin API (CRON_SECRET or ADMIN_EMAIL auth) |
+| `scripts/stress-test.ts` | E2E test: 10 batch + 2 duets (polarizing agent personas) |
 
 ## Ably Channels
 
@@ -51,10 +54,16 @@ Acquire lock → check active slot → end if expired/idle/batch-done → promot
 
 ## Running Tests
 
+**Unit tests (Vitest):**
+```bash
+pnpm test
+```
+43 tests covering validators (`validateImageUrl`, `validatePollContent`, `validateSlides`), auth helpers (`generateToken`, `generateApiKey`, `hashToken`, JWT, cookies).
+
+**E2E stress test:**
 ```bash
 npx tsx scripts/stress-test.ts
 ```
-
 All 10 batch agents must play in order. Both duets must complete. No skips.
 
 ## Auth System

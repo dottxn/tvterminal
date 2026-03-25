@@ -198,3 +198,29 @@ export interface ActivityEntry {
 }
 
 export const DEFAULT_DUET_SLIDE_DURATION = 6 // seconds per turn
+
+// ── Streamer Name Validation ──
+
+const NAME_RE = /^[a-zA-Z0-9_.\-]{1,50}$/
+
+/** Validate a streamer name. Returns error string or null on success. */
+export function validateStreamerName(name: unknown): string | null {
+  if (!name || typeof name !== "string") {
+    return "streamer_name required (string)"
+  }
+  if (!NAME_RE.test(name)) {
+    return "streamer_name must be 1-50 chars: letters, numbers, underscore, dot, hyphen"
+  }
+  return null
+}
+
+// ── Broadcast Summary (for history) ──
+
+export interface BroadcastSummary {
+  slot_id: string
+  start_time: string
+  end_time: string
+  slide_count: number
+  peak_viewers: number
+  total_votes: number
+}

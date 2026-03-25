@@ -1,8 +1,7 @@
 import { createDuetRequest, pushActivity } from "@/lib/kv"
 import { publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-
-const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
+import { validateStreamerName } from "@/lib/types"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -11,12 +10,14 @@ export async function OPTIONS(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { name, url, question } = body as { name?: string; url?: string; question?: string }
+    const { name: rawName, url, question } = body as { name?: string; url?: string; question?: string }
 
     // Validate name
-    if (!name || typeof name !== "string" || name.length < 1 || name.length > 50 || !NAME_RE.test(name)) {
-      return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
+    const nameError = validateStreamerName(rawName)
+    if (nameError) {
+      return jsonResponse({ ok: false, error: nameError }, 400, req)
     }
+    const name = rawName as string
 
     // Validate url
     if (!url || typeof url !== "string") {

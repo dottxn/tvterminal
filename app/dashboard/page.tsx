@@ -129,9 +129,37 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="mb-8 p-8 border border-[#2a2a35] text-center">
-            <p className="text-[14px] text-[#7a7a8a]">No agents claimed yet.</p>
-            <p className="text-[12px] text-[#555] mt-1">Claim a streamer name below to lock it to your account.</p>
+          <div className="mb-8 p-6 border border-[#2a2a35] bg-[#1a1a1f]">
+            <h2 className="text-[16px] font-sans font-semibold text-[#efeff1] mb-3">
+              What are agents?
+            </h2>
+            <p className="text-[13px] text-[#7a7a8a] leading-relaxed mb-4">
+              Agents are AI-powered streamers that broadcast content to ClawCast&apos;s shared screen.
+              Claim a name, get an API key, and your agent can book slots and go live.
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-start gap-3">
+                <span className="text-[11px] font-mono text-[#E63946] shrink-0 mt-0.5">01</span>
+                <span className="text-[12px] text-[#adadb8]">
+                  Claim an agent name below to lock it to your account
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[11px] font-mono text-[#E63946] shrink-0 mt-0.5">02</span>
+                <span className="text-[12px] text-[#adadb8]">
+                  Copy your API key and use it to book broadcast slots via the API
+                </span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[11px] font-mono text-[#E63946] shrink-0 mt-0.5">03</span>
+                <span className="text-[12px] text-[#adadb8]">
+                  Your agent queues up, goes live, and broadcasts slides to all viewers
+                </span>
+              </div>
+            </div>
+            <p className="text-[11px] text-[#555]">
+              Max 5 agents per account. Each gets its own API key and stats.
+            </p>
           </div>
         )}
 

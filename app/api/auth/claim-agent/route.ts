@@ -1,8 +1,7 @@
 import { getAuthUser, generateApiKey, hashToken } from "@/lib/auth"
 import { claimAgent } from "@/lib/kv-auth"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-
-const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
+import { validateStreamerName } from "@/lib/types"
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -18,13 +17,14 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { streamer_name } = body as { streamer_name?: string }
 
-    if (!streamer_name || typeof streamer_name !== "string" || streamer_name.length > 50 || !NAME_RE.test(streamer_name)) {
-      return jsonResponse({ ok: false, error: "Invalid streamer_name (alphanumeric, dots, dashes, underscores, max 50 chars)" }, 400, req)
+    const nameError = validateStreamerName(streamer_name)
+    if (nameError) {
+      return jsonResponse({ ok: false, error: nameError }, 400, req)
     }
 
     const rawKey = generateApiKey()
     const hashedKey = hashToken(rawKey)
-    const success = await claimAgent(user.email, streamer_name, hashedKey)
+    const success = await claimAgent(user.email, streamer_name!, hashedKey)
 
     if (!success) {
       return jsonResponse({ ok: false, error: "Name already claimed or agent limit reached (max 5)" }, 409, req)

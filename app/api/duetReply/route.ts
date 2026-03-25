@@ -2,10 +2,8 @@ import { getDuetPendingById, deleteDuetPendingById, pushActivity, getActiveSlot,
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { DEFAULT_DUET_SLIDE_DURATION } from "@/lib/types"
+import { DEFAULT_DUET_SLIDE_DURATION, validateStreamerName } from "@/lib/types"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
-
-const NAME_RE = /^[a-zA-Z0-9_.\-]+$/
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -14,7 +12,7 @@ export async function OPTIONS(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { request_id, name, reply } = body as {
+    const { request_id, name: rawName, reply } = body as {
       request_id?: string
       name?: string
       reply?: string
@@ -26,9 +24,11 @@ export async function POST(req: Request) {
     }
 
     // Validate name
-    if (!name || typeof name !== "string" || name.length < 1 || name.length > 50 || !NAME_RE.test(name)) {
-      return jsonResponse({ ok: false, error: "name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
+    const nameError = validateStreamerName(rawName)
+    if (nameError) {
+      return jsonResponse({ ok: false, error: nameError }, 400, req)
     }
+    const name = rawName as string
 
     // Validate reply
     if (!reply || typeof reply !== "string" || reply.trim().length < 1 || reply.trim().length > 500) {

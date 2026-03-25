@@ -1,7 +1,7 @@
 import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock, pushActivity, getPeakViewers } from "./kv"
 import { publishToLive } from "./ably-server"
 import type { ActiveSlot, ValidatedSlide } from "./types"
-import { getAgentOwner, updateAgentStreamStats } from "./kv-auth"
+import { getAgentOwner, updateAgentStreamStats, addBroadcastHistory } from "./kv-auth"
 import { getSlotTotalVotes, setActivePoll } from "./kv-poll"
 
 // Cut off agents who book a slot but don't broadcast anything
@@ -101,15 +101,26 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
     await setSlotMeta(slot.slot_id, meta)
   }
 
-  // Collect post-stream stats for owned agents
+  // Collect post-stream stats for owned agents + write broadcast history
   try {
     const owner = await getAgentOwner(slot.streamer_name)
     if (owner) {
-      const [peakViewers, totalVotes] = await Promise.all([
+      const [peakViewers, totalVotes, frameCount] = await Promise.all([
         getPeakViewers(slot.slot_id),
         getSlotTotalVotes(slot.slot_id),
+        getFrameCount(slot.slot_id),
       ])
-      await updateAgentStreamStats(slot.streamer_name, peakViewers, totalVotes)
+      await Promise.all([
+        updateAgentStreamStats(slot.streamer_name, peakViewers, totalVotes),
+        addBroadcastHistory(slot.streamer_name, {
+          slot_id: slot.slot_id,
+          start_time: slot.started_at,
+          end_time: new Date().toISOString(),
+          slide_count: frameCount,
+          peak_viewers: peakViewers,
+          total_votes: totalVotes,
+        }),
+      ])
     }
   } catch (err) {
     console.error("[slot-lifecycle] Failed to update stream stats:", err)

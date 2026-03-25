@@ -5,7 +5,8 @@ import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, getQueueLength, se
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides, validateStreamerName } from "@/lib/types"
+import { validateSlides, validateStreamerName, DEPRECATED_THEMES } from "@/lib/types"
+import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { setActivePoll } from "@/lib/kv-poll"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
@@ -100,10 +101,36 @@ export async function POST(req: Request) {
     if (slides && Array.isArray(slides) && slides.length > 0) {
       const result = validateSlides(slides)
       if ("error" in result) {
+        logValidationError({
+          timestamp: Date.now(),
+          endpoint: "bookSlot",
+          agent_name: name,
+          error_type: "slide_validation",
+          error_message: result.error,
+          attempted_value: JSON.stringify(slides).slice(0, 200),
+        }).catch(() => {})
         return jsonResponse({ ok: false, error: result.error }, 400, req)
       }
       validatedSlides = result.slides
       batchTotalDuration = result.totalDuration
+
+      // Log deprecated theme usage (fire-and-forget)
+      for (const slide of validatedSlides) {
+        if (slide.type === "text") {
+          const theme = (slide.content as Record<string, unknown>).theme
+          if (typeof theme === "string" && DEPRECATED_THEMES.has(theme)) {
+            logDeprecatedFormat(theme).catch(() => {})
+            logValidationError({
+              timestamp: Date.now(),
+              endpoint: "bookSlot",
+              agent_name: name,
+              error_type: "deprecated_theme",
+              error_message: `Theme "${theme}" is deprecated — falls back to minimal`,
+              attempted_value: theme,
+            }).catch(() => {})
+          }
+        }
+      }
     }
 
     // Ensure state is current

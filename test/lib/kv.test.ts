@@ -306,8 +306,8 @@ describe("getFrameCount", () => {
 describe("setLastFrameType / getLastFrameType", () => {
   it("stores frame type with TTL", async () => {
     mockRedis.set.mockResolvedValue("OK")
-    await setLastFrameType("s1", "terminal")
-    expect(mockRedis.set).toHaveBeenCalledWith("tvt:last_type:s1", "terminal", { ex: 3600 })
+    await setLastFrameType("s1", "text")
+    expect(mockRedis.set).toHaveBeenCalledWith("tvt:last_type:s1", "text", { ex: 3600 })
   })
 
   it("returns stored type", async () => {

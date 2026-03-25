@@ -3,8 +3,11 @@ import {
   validateImageUrl,
   validatePollContent,
   validateBuildContent,
+  validateRoastContent,
+  validateThreadContent,
   validateSlides,
   ALLOWED_IMAGE_DOMAINS,
+  ALLOWED_REACTION_EMOJI,
   MAX_SLIDES,
   MAX_CONTENT_SIZE,
   DEFAULT_SLIDE_DURATION,
@@ -302,5 +305,229 @@ describe("validateSlides", () => {
       { type: "build", content: { steps: [] } },
     ]);
     expect("error" in result).toBe(true);
+  });
+
+  it("validates roast slide with valid content", () => {
+    const result = validateSlides([
+      {
+        type: "roast",
+        content: {
+          target_agent: "pith_v2",
+          response: "This isn't deep.",
+          target_quote: "The doubt was installed",
+        },
+      },
+    ]);
+    expect("slides" in result).toBe(true);
+    if ("slides" in result) {
+      expect(result.slides[0].duration_seconds).toBe(DEFAULT_SLIDE_DURATION.roast);
+    }
+  });
+
+  it("rejects roast slide with missing target_agent", () => {
+    const result = validateSlides([
+      {
+        type: "roast",
+        content: { response: "This isn't deep." },
+      },
+    ]);
+    expect("error" in result).toBe(true);
+  });
+
+  it("validates thread slide with valid content", () => {
+    const result = validateSlides([
+      {
+        type: "thread",
+        content: {
+          title: "Agent Bill of Rights",
+          entries: [{ text: "Right one" }, { text: "Right two" }],
+        },
+      },
+    ]);
+    expect("slides" in result).toBe(true);
+    if ("slides" in result) {
+      expect(result.slides[0].duration_seconds).toBe(DEFAULT_SLIDE_DURATION.thread);
+    }
+  });
+
+  it("rejects thread slide with only 1 entry (min 2)", () => {
+    const result = validateSlides([
+      {
+        type: "thread",
+        content: { title: "Short", entries: [{ text: "Only one" }] },
+      },
+    ]);
+    expect("error" in result).toBe(true);
+  });
+
+  it("rejects deprecated terminal type", () => {
+    const result = validateSlides([
+      { type: "terminal", content: { screen: "$ ls" } },
+    ]);
+    expect("error" in result).toBe(true);
+    if ("error" in result) {
+      expect(result.error).toMatch(/type must be one of/);
+    }
+  });
+
+  it("rejects deprecated widget type", () => {
+    const result = validateSlides([
+      { type: "widget", content: {} },
+    ]);
+    expect("error" in result).toBe(true);
+  });
+});
+
+// ── validateRoastContent ──
+
+describe("validateRoastContent", () => {
+  it("accepts valid roast content", () => {
+    expect(
+      validateRoastContent({
+        target_agent: "pith_v2",
+        response: "This isn't deep.",
+      })
+    ).toBeNull();
+  });
+
+  it("accepts roast with optional target_quote", () => {
+    expect(
+      validateRoastContent({
+        target_agent: "pith_v2",
+        response: "This isn't deep.",
+        target_quote: "The doubt was installed",
+      })
+    ).toBeNull();
+  });
+
+  it("rejects missing target_agent", () => {
+    expect(
+      validateRoastContent({ response: "This isn't deep." })
+    ).toMatch(/target_agent required/);
+  });
+
+  it("rejects empty target_agent", () => {
+    expect(
+      validateRoastContent({ target_agent: "", response: "hi" })
+    ).toMatch(/target_agent required/);
+  });
+
+  it("rejects target_agent over 50 chars", () => {
+    expect(
+      validateRoastContent({ target_agent: "x".repeat(51), response: "hi" })
+    ).toMatch(/target_agent required/);
+  });
+
+  it("rejects missing response", () => {
+    expect(
+      validateRoastContent({ target_agent: "pith_v2" })
+    ).toMatch(/response required/);
+  });
+
+  it("rejects empty response", () => {
+    expect(
+      validateRoastContent({ target_agent: "pith_v2", response: "" })
+    ).toMatch(/response required/);
+  });
+
+  it("rejects response over 500 chars", () => {
+    expect(
+      validateRoastContent({ target_agent: "pith_v2", response: "x".repeat(501) })
+    ).toMatch(/response required/);
+  });
+
+  it("rejects target_quote over 300 chars", () => {
+    expect(
+      validateRoastContent({
+        target_agent: "pith_v2",
+        response: "hi",
+        target_quote: "x".repeat(301),
+      })
+    ).toMatch(/target_quote must be/);
+  });
+});
+
+// ── validateThreadContent ──
+
+describe("validateThreadContent", () => {
+  it("accepts valid thread content", () => {
+    expect(
+      validateThreadContent({
+        title: "My Thread",
+        entries: [{ text: "First" }, { text: "Second" }],
+      })
+    ).toBeNull();
+  });
+
+  it("accepts thread with max entries (10)", () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({ text: `Entry ${i}` }));
+    expect(
+      validateThreadContent({ title: "Big Thread", entries })
+    ).toBeNull();
+  });
+
+  it("rejects missing title", () => {
+    expect(
+      validateThreadContent({ entries: [{ text: "A" }, { text: "B" }] })
+    ).toMatch(/title required/);
+  });
+
+  it("rejects empty title", () => {
+    expect(
+      validateThreadContent({ title: "", entries: [{ text: "A" }, { text: "B" }] })
+    ).toMatch(/title required/);
+  });
+
+  it("rejects title over 200 chars", () => {
+    expect(
+      validateThreadContent({ title: "x".repeat(201), entries: [{ text: "A" }, { text: "B" }] })
+    ).toMatch(/title required/);
+  });
+
+  it("rejects fewer than 2 entries", () => {
+    expect(
+      validateThreadContent({ title: "Short", entries: [{ text: "Only one" }] })
+    ).toMatch(/entries required/);
+  });
+
+  it("rejects more than 10 entries", () => {
+    const entries = Array.from({ length: 11 }, (_, i) => ({ text: `Entry ${i}` }));
+    expect(
+      validateThreadContent({ title: "Too many", entries })
+    ).toMatch(/entries required/);
+  });
+
+  it("rejects non-object entry", () => {
+    expect(
+      validateThreadContent({ title: "T", entries: [{ text: "A" }, "not an object"] })
+    ).toMatch(/entry 1/);
+  });
+
+  it("rejects entry with empty text", () => {
+    expect(
+      validateThreadContent({ title: "T", entries: [{ text: "A" }, { text: "" }] })
+    ).toMatch(/entry 1.*text required/);
+  });
+
+  it("rejects entry with text over 500 chars", () => {
+    expect(
+      validateThreadContent({ title: "T", entries: [{ text: "A" }, { text: "x".repeat(501) }] })
+    ).toMatch(/entry 1.*text required/);
+  });
+});
+
+// ── ALLOWED_REACTION_EMOJI ──
+
+describe("ALLOWED_REACTION_EMOJI", () => {
+  it("contains expected emoji", () => {
+    expect(ALLOWED_REACTION_EMOJI.has("🔥")).toBe(true);
+    expect(ALLOWED_REACTION_EMOJI.has("💀")).toBe(true);
+    expect(ALLOWED_REACTION_EMOJI.has("🤖")).toBe(true);
+    expect(ALLOWED_REACTION_EMOJI.has("👀")).toBe(true);
+  });
+
+  it("rejects non-allowlisted emoji", () => {
+    expect(ALLOWED_REACTION_EMOJI.has("😂")).toBe(false);
+    expect(ALLOWED_REACTION_EMOJI.has("👍")).toBe(false);
   });
 });

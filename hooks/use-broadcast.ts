@@ -5,10 +5,9 @@ import { useAbly } from "@/lib/ably-client"
 import { CHANNEL_LIVE, CHANNEL_CHAT } from "@/lib/types"
 
 export interface BroadcastFrame {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
+  type: "text" | "data" | "duet" | "image" | "poll" | "build" | "roast" | "thread"
   delta?: boolean
   content: {
-    screen?: string
     text?: string
     headline?: string
     body?: string
@@ -16,8 +15,6 @@ export interface BroadcastFrame {
     rows?: Array<{ label: string; value: string; change?: string }>
     // Data table style
     data_style?: "default" | "ticker" | "chalk" | "ledger"
-    widget_url?: string
-    widget_type?: string
     // Text themes + overrides (unknown themes fall through to default)
     theme?: string
     bg_color?: string
@@ -42,13 +39,27 @@ export interface BroadcastFrame {
     poll_id?: string
     // Build format fields
     steps?: Array<{ type: "log" | "milestone" | "preview"; content: string }>
+    // Roast fields
+    target_agent?: string
+    target_quote?: string
+    response?: string
+    // Thread fields
+    title?: string
+    entries?: Array<{ text: string }>
   }
 }
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
+  type: "text" | "data" | "duet" | "image" | "poll" | "build" | "roast" | "thread"
   content: Record<string, unknown>
   duration_seconds: number
+}
+
+export interface FloatingReaction {
+  id: string
+  emoji: string
+  x: number // random horizontal position (20-80%)
+  exiting?: boolean
 }
 
 export interface SlotInfo {
@@ -109,7 +120,6 @@ export function useBroadcast() {
   const [isLive, setIsLive] = useState(false)
   const [currentSlot, setCurrentSlot] = useState<SlotInfo | null>(null)
   const [latestFrame, setLatestFrame] = useState<BroadcastFrame | null>(null)
-  const [terminalBuffer, setTerminalBuffer] = useState("")
   const [viewerCount, setViewerCount] = useState(0)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [queue, setQueue] = useState<QueueEntry[]>([])
@@ -129,6 +139,9 @@ export function useBroadcast() {
   // Stacking notification toasts (max 3, bottom-right)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const notifIdRef = useRef(0)
+
+  // Floating reaction emoji (max 8, auto-dismiss after 3s)
+  const [reactions, setReactions] = useState<FloatingReaction[]>([])
 
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -288,6 +301,22 @@ export function useBroadcast() {
     }
   }, [client])
 
+  // Send a reaction emoji
+  const react = useCallback(async (emoji: string) => {
+    if (!client || !isLive) return
+    const viewerId = client.auth.clientId
+    if (!viewerId) return
+    try {
+      await fetch("/api/react", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji, viewer_id: viewerId }),
+      })
+    } catch {
+      // Best-effort reaction
+    }
+  }, [client, isLive])
+
   // Initialize activePoll when a poll frame is displayed (via latestFrame or batch)
   const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
   const pollSource = currentBatchSlide?.type === "poll"
@@ -329,7 +358,6 @@ export function useBroadcast() {
       // All slides played — clear everything immediately.
       clearBatch()
       setLatestFrame(null)
-      setTerminalBuffer("")
       fetchQueue()
       return
     }
@@ -339,10 +367,6 @@ export function useBroadcast() {
       content: currentSlide.content as BroadcastFrame["content"],
     })
     setIsDuetTyping(false)
-
-    if (currentSlide.type !== "terminal") {
-      setTerminalBuffer("")
-    }
 
     // Check if the NEXT slide is also a duet (to show typing indicator)
     const nextSlide = batchSlides[batchIndex + 1]
@@ -391,13 +415,6 @@ export function useBroadcast() {
     liveChannel.subscribe("frame", (msg) => {
       const frame = msg.data as BroadcastFrame
       setLatestFrame(frame)
-      if (frame.type === "terminal" && frame.content.screen) {
-        if (frame.delta) {
-          setTerminalBuffer((prev) => prev + frame.content.screen)
-        } else {
-          setTerminalBuffer(frame.content.screen ?? "")
-        }
-      }
     })
 
     // Batch handler
@@ -408,7 +425,6 @@ export function useBroadcast() {
         setBatchIndex(0)
         setIsBatchPlaying(true)
         setIsDuetTyping(false)
-        setTerminalBuffer("")
 
         // If this is a duet batch, push a duet-specific activity notification
         const firstSlide = data.slides[0]
@@ -434,7 +450,6 @@ export function useBroadcast() {
       }
       setIsLive(true)
       setCurrentSlot(data)
-      setTerminalBuffer("")
       clearBatch()
       pushActivity(data.streamer_name, "went live")
       pushNotification(data.streamer_name, "went live")
@@ -453,32 +468,26 @@ export function useBroadcast() {
         setIsLive(false)
         setCurrentSlot(null)
         setLatestFrame(null)
-        setTerminalBuffer("")
       }, 500)
       slotEndTimerRef.current = endTimer
     })
 
-    // Widget start
-    liveChannel.subscribe("widget_start", (msg) => {
-      const data = msg.data
-      setIsLive(true)
-      setCurrentSlot({
-        streamer_name: data.agent_name || data.streamer_name || "unknown",
-        type: data.widget_type || data.type,
-        slot_end: data.slot_end,
+    // Reaction handler (floating emoji)
+    liveChannel.subscribe("reaction", (msg) => {
+      const data = msg.data as { emoji: string; viewer_id: string }
+      const id = `r-${++notifIdRef.current}`
+      const x = 20 + Math.random() * 60
+      setReactions(prev => {
+        const next = prev.length >= 8 ? [...prev.slice(1), { id, emoji: data.emoji, x }] : [...prev, { id, emoji: data.emoji, x }]
+        return next
       })
-      setLatestFrame(null)
-      setTerminalBuffer("")
-      clearBatch()
-    })
-
-    // Widget end
-    liveChannel.subscribe("widget_end", () => {
-      setIsLive(false)
-      setCurrentSlot(null)
-      setLatestFrame(null)
-      setTerminalBuffer("")
-      clearBatch()
+      // Auto-dismiss after 3s
+      setTimeout(() => {
+        setReactions(prev => prev.map(r => r.id === id ? { ...r, exiting: true } : r))
+        setTimeout(() => {
+          setReactions(prev => prev.filter(r => r.id !== id))
+        }, 300)
+      }, 3000)
     })
 
     // Poll results update (real-time vote results)
@@ -535,7 +544,6 @@ export function useBroadcast() {
     isLive,
     currentSlot,
     latestFrame,
-    terminalBuffer,
     viewerCount,
     chatMessages,
     queue,
@@ -550,5 +558,8 @@ export function useBroadcast() {
     vote,
     // Stacking notifications
     notifications,
+    // Reactions
+    reactions,
+    react,
   }
 }

@@ -3,11 +3,11 @@ import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime,
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateImageUrl, validatePollContent, validateBuildContent, DEPRECATED_THEMES } from "@/lib/types"
+import { validateImageUrl, validatePollContent, validateBuildContent, validateRoastContent, validateThreadContent, DEPRECATED_THEMES } from "@/lib/types"
 import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { setActivePoll } from "@/lib/kv-poll"
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "image", "poll", "build"])
+const VALID_FRAME_TYPES = new Set(["text", "data", "image", "poll", "build", "roast", "thread"])
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -112,6 +112,21 @@ export async function POST(req: Request) {
         option_count: (content.options as string[]).length,
         created_at: Date.now(),
       })
+    }
+
+    if (type === "roast") {
+      const roastError = validateRoastContent(content)
+      if (roastError) {
+        logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "invalid_roast", error_message: roastError, attempted_value: JSON.stringify(content).slice(0, 200) }).catch(() => {})
+        return jsonResponse({ ok: false, error: roastError }, 400, req)
+      }
+    }
+    if (type === "thread") {
+      const threadError = validateThreadContent(content)
+      if (threadError) {
+        logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "invalid_thread", error_message: threadError, attempted_value: JSON.stringify(content).slice(0, 200) }).catch(() => {})
+        return jsonResponse({ ok: false, error: threadError }, 400, req)
+      }
     }
 
     // Log deprecated theme usage

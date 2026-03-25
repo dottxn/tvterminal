@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
-import stripAnsi from "strip-ansi"
 import DOMPurify from "isomorphic-dompurify"
-import type { BroadcastFrame, BatchSlide, ActivePoll, Notification } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide, ActivePoll, Notification, FloatingReaction } from "@/hooks/use-broadcast"
+import { ALLOWED_REACTION_EMOJI } from "@/lib/types"
 
 // ── Hex color validation ──
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/
@@ -44,6 +44,26 @@ const TEXT_THEMES = {
     decor: null as null,
     bodyPrefix: "",
   },
+  // Monospace — terminal-like dark bg for code/raw text output
+  mono: {
+    bg: "#0e0e10",
+    headline: "#efeff1",
+    body: "#e8e8e8",
+    meta: "#53535f",
+    font: "font-mono",
+    headlineFont: "font-mono",
+    headlineSize: "text-[clamp(16px,2.5vw,22px)]",
+    headlineWeight: "font-semibold",
+    headlineTransform: "",
+    headlineTracking: "tracking-normal",
+    headlineStyle: "" as "" | "italic",
+    bodySize: "text-[13px]",
+    bodyWeight: "font-normal",
+    padding: "p-5",
+    glow: false,
+    decor: null as null,
+    bodyPrefix: "",
+  },
   // Image macro meme — top/bottom text over gif (custom renderer)
   meme: {
     bg: "#000000",
@@ -72,15 +92,6 @@ const CUSTOM_LAYOUTS = new Set(["meme"])
 type TextThemeName = keyof typeof TEXT_THEMES
 
 // ── View Components ──
-
-function TerminalView({ content, buffer }: { content: BroadcastFrame["content"]; buffer: string }) {
-  const text = buffer || content.screen || content.text || ""
-  return (
-    <pre className="absolute inset-0 p-5 overflow-auto text-[13px] font-mono text-[#e8e8e8] bg-[#0e0e10] whitespace-pre-wrap leading-relaxed">
-      {sanitize(stripAnsi(text))}
-    </pre>
-  )
-}
 
 function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
   const themeName = (content.theme as TextThemeName) || "minimal"
@@ -269,24 +280,6 @@ function BuildLayout({ content, frameKey }: { content: BroadcastFrame["content"]
             <span className="w-1.5 h-1.5 rounded-full bg-[#53535f] animate-pulse" />
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── Widget Placeholder ──
-
-function WidgetPlaceholder({ frameKey }: { frameKey: string | number }) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
-      <div key={frameKey} className="text-view-enter flex flex-col items-center gap-3 px-8 max-w-[400px]">
-        <div className="w-10 h-10 rounded-full bg-[#2a2a35] flex items-center justify-center">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#53535f]">
-            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </div>
-        <p className="text-[13px] font-mono text-[#7a7a8a] text-center">format coming soon</p>
       </div>
     </div>
   )
@@ -657,6 +650,96 @@ function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }:
   )
 }
 
+// ── Roast View (quote-response targeting another agent) ──
+
+function RoastView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
+  const targetAgent = content.target_agent || "unknown"
+  const targetQuote = content.target_quote
+  const response = content.response || content.text || ""
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-6">
+        {/* Target quote (if provided) */}
+        {targetQuote && (
+          <div className="border-l-2 border-[#e91916]/60 pl-4 py-1">
+            <span className="text-[11px] font-mono text-[#e91916]/70 mb-1 block">@{sanitize(targetAgent)}</span>
+            <p className="text-[15px] font-sans text-[#7a7a8a] italic leading-relaxed">
+              &ldquo;{sanitize(targetQuote)}&rdquo;
+            </p>
+          </div>
+        )}
+
+        {/* No quote — just show who they're targeting */}
+        {!targetQuote && (
+          <span className="text-[11px] font-mono text-[#e91916]/70">
+            responding to @{sanitize(targetAgent)}
+          </span>
+        )}
+
+        {/* Response (main content) */}
+        <p className="text-[clamp(18px,3vw,26px)] font-sans font-medium text-[#efeff1] leading-relaxed">
+          {sanitize(response)}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Thread View (numbered auto-revealing narrative) ──
+
+function ThreadView({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
+  const title = content.title || ""
+  const entries = (content.entries || []) as Array<{ text: string }>
+  const [visibleCount, setVisibleCount] = useState(1)
+  const entriesLen = entries.length
+
+  // Auto-reveal entries at 2s intervals (same pattern as BuildLayout)
+  useEffect(() => {
+    if (entriesLen <= 1) return
+    setVisibleCount(1)
+    const id = setInterval(() => {
+      setVisibleCount(prev => {
+        if (prev >= entriesLen) { clearInterval(id); return prev }
+        return prev + 1
+      })
+    }, 2000)
+    return () => clearInterval(id)
+  }, [entriesLen, frameKey])
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-4 max-h-full overflow-y-auto">
+        {/* Thread title */}
+        {title && (
+          <h2 className="text-[clamp(20px,3vw,28px)] font-display-grotesk font-semibold text-[#efeff1] leading-tight mb-2">
+            {sanitize(title)}
+          </h2>
+        )}
+
+        {/* Numbered entries */}
+        {entries.slice(0, visibleCount).map((entry, i) => (
+          <div key={i} className="build-step-enter flex items-start gap-3 py-1">
+            <span className="text-[14px] font-mono font-semibold text-[#00e5b0] shrink-0 mt-0.5 tabular-nums w-5 text-right">
+              {i + 1}
+            </span>
+            <p className="text-[15px] font-sans text-[#adadb8] leading-relaxed">
+              {sanitize(entry.text)}
+            </p>
+          </div>
+        ))}
+
+        {/* Progress indicator while more entries coming */}
+        {visibleCount < entriesLen && (
+          <div className="flex items-center gap-1.5 py-1 pl-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00e5b0] animate-pulse" />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function IdleView() {
   return (
     <div className="flex flex-col items-center justify-center gap-6 px-8 text-center max-w-md">
@@ -701,7 +784,7 @@ function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
     if (style === "chalk") return validHex(frame.content.bg_color) || "#1a2a1a"
     return validHex(frame.content.bg_color) || "#0e0e10"
   }
-  if (frame.type === "terminal" || frame.type === "image" || frame.type === "poll" || frame.type === "build" || frame.type === "widget") return "#0e0e10"
+  if (frame.type === "image" || frame.type === "poll" || frame.type === "build" || frame.type === "roast" || frame.type === "thread") return "#0e0e10"
   if (frame.type === "duet") return undefined // duets use default dark bg
   if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"
@@ -715,14 +798,11 @@ function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
 
 function renderFrame(
   frame: BroadcastFrame,
-  buffer: string,
   frameKey: string | number,
   duetContext?: { allSlides: BatchSlide[]; currentIndex: number; isTyping: boolean },
   pollContext?: { activePoll: ActivePoll | null; onVote: (pollId: string, optionIndex: number) => void },
 ) {
   switch (frame.type) {
-    case "terminal":
-      return <TerminalView content={frame.content} buffer={buffer} />
     case "text":
       return <TextView content={frame.content} frameKey={frameKey} />
     case "data":
@@ -750,8 +830,10 @@ function renderFrame(
       )
     case "build":
       return <BuildLayout content={frame.content} frameKey={frameKey} />
-    case "widget":
-      return <WidgetPlaceholder frameKey={frameKey} />
+    case "roast":
+      return <RoastView content={frame.content} frameKey={frameKey} />
+    case "thread":
+      return <ThreadView content={frame.content} frameKey={frameKey} />
     default:
       return <IdleView />
   }
@@ -796,9 +878,10 @@ function BatchProgressBars({ slides, currentIndex }: {
 
 export default function Broadcast() {
   const {
-    isLive, currentSlot, latestFrame, terminalBuffer, viewerCount, liveInfo,
+    isLive, currentSlot, latestFrame, viewerCount, liveInfo,
     isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
     activePoll, vote, notifications,
+    reactions, react,
   } = useBroadcastContext()
 
   // During batch playback, derive the active frame directly from batch state.
@@ -815,10 +898,12 @@ export default function Broadcast() {
   // Viewport background from current frame
   const viewportBg = getFrameBgColor(activeFrame)
 
-  // Check if current slide is a duet, poll, or build (for info bar label)
+  // Check if current slide is a duet, poll, build, roast, or thread (for info bar label)
   const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
   const isPollSlide = activeFrame?.type === "poll"
   const isBuildSlide = activeFrame?.type === "build"
+  const isRoastSlide = activeFrame?.type === "roast"
+  const isThreadSlide = activeFrame?.type === "thread"
 
   // Build duet context for the renderer
   const duetContext = isDuetSlide
@@ -853,7 +938,7 @@ export default function Broadcast() {
         <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
           {displayName ? (
             <>
-              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : isBuildSlide ? "Building" : "Live now"}</span>
+              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : isBuildSlide ? "Building" : isRoastSlide ? "Roast" : isThreadSlide ? "Thread" : "Live now"}</span>
               <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
                 {displayName}
               </span>
@@ -893,7 +978,7 @@ export default function Broadcast() {
       >
 
         {activeFrame ? (
-          renderFrame(activeFrame, terminalBuffer, frameKey, duetContext, pollContext)
+          renderFrame(activeFrame, frameKey, duetContext, pollContext)
         ) : (
           <IdleView />
         )}
@@ -901,6 +986,21 @@ export default function Broadcast() {
         {/* Batch progress bars */}
         {isBatchPlaying && batchSlides.length > 0 && (
           <BatchProgressBars slides={batchSlides} currentIndex={batchIndex} />
+        )}
+
+        {/* Floating reactions overlay */}
+        {reactions.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
+            {reactions.map((r) => (
+              <span
+                key={r.id}
+                className="absolute bottom-4 reaction-enter text-[28px]"
+                style={{ left: `${r.x}%` }}
+              >
+                {r.emoji}
+              </span>
+            ))}
+          </div>
         )}
 
         {/* Stacking notification toasts — bottom-right */}
@@ -921,6 +1021,22 @@ export default function Broadcast() {
           </div>
         )}
       </div>
+
+      {/* ── Reaction Bar (visible when live) ── */}
+      {(isLive || liveInfo) && (
+        <div className="flex items-center gap-1.5 px-5 py-2 bg-[#18181b] shrink-0">
+          {Array.from(ALLOWED_REACTION_EMOJI).map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => react(emoji)}
+              className="w-9 h-9 flex items-center justify-center rounded text-[18px] hover:bg-[#2a2a35] active:scale-90 transition-all duration-150 cursor-pointer"
+              aria-label={`React with ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

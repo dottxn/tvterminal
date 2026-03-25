@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import type { BroadcastFrame, BatchSlide, ActivePoll, Notification } from "@/hooks/use-broadcast"
 
@@ -16,9 +16,13 @@ function stripAnsi(str: string): string {
 }
 
 // ── Text Themes ──
+// Only `minimal` (default fallback) and `meme` (custom layout) survive.
+// All other mood themes (bold, neon, warm, matrix, editorial, retro) and
+// platform-cosplay layouts (tweet, reddit, research) have been killed.
+// Unknown theme names fall through to `minimal`.
 
 const TEXT_THEMES = {
-  // Clean modern editorial — Space Grotesk headlines, Geist body
+  // Default text layout — Space Grotesk headlines, Geist body
   minimal: {
     bg: "transparent",
     headline: "#efeff1",
@@ -33,140 +37,12 @@ const TEXT_THEMES = {
     headlineStyle: "" as "" | "italic",
     bodySize: "text-[16px]",
     bodyWeight: "font-normal",
-    textAlign: "center" as const,
     padding: "p-10",
     glow: false,
     decor: null as null,
     bodyPrefix: "",
   },
-  // High-impact poster — Bebas Neue headlines, Geist body
-  bold: {
-    bg: "#0a0a0c",
-    headline: "#E63946",
-    body: "#efeff1",
-    meta: "#7a7a8a",
-    font: "font-sans",
-    headlineFont: "font-display-bebas",
-    headlineSize: "text-[clamp(36px,7vw,72px)]",
-    headlineWeight: "font-normal",
-    headlineTransform: "uppercase",
-    headlineTracking: "tracking-wide",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[17px]",
-    bodyWeight: "font-normal",
-    textAlign: "center" as const,
-    padding: "px-8 py-10",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Cyberpunk terminal — Space Mono, glowing neon
-  neon: {
-    bg: "#06061a",
-    headline: "#00e5b0",
-    body: "#7ad4c4",
-    meta: "#2d6b5e",
-    font: "font-display-space",
-    headlineFont: "font-display-space",
-    headlineSize: "text-[clamp(22px,3.5vw,36px)]",
-    headlineWeight: "font-bold",
-    headlineTransform: "uppercase",
-    headlineTracking: "tracking-[0.2em]",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[14px]",
-    bodyWeight: "font-normal",
-    textAlign: "center" as const,
-    padding: "p-12",
-    glow: true,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Rich literary — DM Serif Display headlines, Geist body
-  warm: {
-    bg: "#120904",
-    headline: "#f0a050",
-    body: "#c8a882",
-    meta: "#7a5f42",
-    font: "font-sans",
-    headlineFont: "font-display-serif",
-    headlineSize: "text-[clamp(28px,4.5vw,48px)]",
-    headlineWeight: "font-normal",
-    headlineTransform: "",
-    headlineTracking: "",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[17px]",
-    bodyWeight: "font-light",
-    textAlign: "left" as const,
-    padding: "pl-12 pr-8 py-10",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Hacker console — Geist Mono, green phosphor
-  matrix: {
-    bg: "#000000",
-    headline: "#00c853",
-    body: "#00a844",
-    meta: "#006b2b",
-    font: "font-mono",
-    headlineFont: "font-mono",
-    headlineSize: "text-[clamp(18px,2.8vw,30px)]",
-    headlineWeight: "font-bold",
-    headlineTransform: "uppercase",
-    headlineTracking: "tracking-wide",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[14px]",
-    bodyWeight: "font-normal",
-    textAlign: "left" as const,
-    padding: "pl-10 pr-8 py-8",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "> ",
-  },
-  // Dramatic magazine — Playfair Display italic headlines, Geist body
-  editorial: {
-    bg: "#0c0c10",
-    headline: "#ffffff",
-    body: "#b0b0bc",
-    meta: "#5a5a68",
-    font: "font-sans",
-    headlineFont: "font-display-playfair",
-    headlineSize: "text-[clamp(28px,5vw,56px)]",
-    headlineWeight: "font-black",
-    headlineTransform: "",
-    headlineTracking: "tracking-tight",
-    headlineStyle: "italic" as const,
-    bodySize: "text-[16px]",
-    bodyWeight: "font-light",
-    textAlign: "center" as const,
-    padding: "px-12 py-10",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Geometric lo-fi — Syne headlines, Geist Mono body
-  retro: {
-    bg: "#0d0d14",
-    headline: "#ffd700",
-    body: "#d4c8a0",
-    meta: "#7a7460",
-    font: "font-mono",
-    headlineFont: "font-display-syne",
-    headlineSize: "text-[clamp(26px,4.5vw,48px)]",
-    headlineWeight: "font-extrabold",
-    headlineTransform: "uppercase",
-    headlineTracking: "tracking-tight",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[14px]",
-    bodyWeight: "font-normal",
-    textAlign: "left" as const,
-    padding: "pl-10 pr-8 py-10",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // ── Layout-breaking themes (custom renderers) ──
-  // Image macro meme — top/bottom text over gif
+  // Image macro meme — top/bottom text over gif (custom renderer)
   meme: {
     bg: "#000000",
     headline: "#ffffff",
@@ -181,70 +57,6 @@ const TEXT_THEMES = {
     headlineStyle: "" as "" | "italic",
     bodySize: "text-[clamp(28px,5vw,56px)]",
     bodyWeight: "font-normal",
-    textAlign: "center" as const,
-    padding: "p-0",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Social post card — tweet-like layout
-  tweet: {
-    bg: "#000000",
-    headline: "#e7e9ea",
-    body: "#e7e9ea",
-    meta: "#71767b",
-    font: "font-sans",
-    headlineFont: "font-sans",
-    headlineSize: "text-[15px]",
-    headlineWeight: "font-bold",
-    headlineTransform: "",
-    headlineTracking: "",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[15px]",
-    bodyWeight: "font-normal",
-    textAlign: "left" as const,
-    padding: "p-0",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Reddit post card — upvote sidebar + post
-  reddit: {
-    bg: "#1a1a1b",
-    headline: "#d7dadc",
-    body: "#d7dadc",
-    meta: "#818384",
-    font: "font-sans",
-    headlineFont: "font-sans",
-    headlineSize: "text-[clamp(18px,2.5vw,22px)]",
-    headlineWeight: "font-semibold",
-    headlineTransform: "",
-    headlineTracking: "",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[14px]",
-    bodyWeight: "font-normal",
-    textAlign: "left" as const,
-    padding: "p-0",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  // Academic research paper layout
-  research: {
-    bg: "#0e0e10",
-    headline: "#efeff1",
-    body: "#c8c8d0",
-    meta: "#7a7a8a",
-    font: "font-sans",
-    headlineFont: "font-display-playfair",
-    headlineSize: "text-[clamp(20px,3vw,30px)]",
-    headlineWeight: "font-bold",
-    headlineTransform: "",
-    headlineTracking: "tracking-tight",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[14px]",
-    bodyWeight: "font-normal",
-    textAlign: "left" as const,
     padding: "p-0",
     glow: false,
     decor: null as null,
@@ -252,8 +64,8 @@ const TEXT_THEMES = {
   },
 } as const
 
-// Themes with custom layout renderers
-const CUSTOM_LAYOUTS = new Set(["meme", "tweet", "reddit", "research"])
+// Meme is the only text theme with a custom layout renderer
+const CUSTOM_LAYOUTS = new Set(["meme"])
 
 type TextThemeName = keyof typeof TEXT_THEMES
 
@@ -272,14 +84,9 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
   const themeName = (content.theme as TextThemeName) || "minimal"
   const theme = TEXT_THEMES[themeName] || TEXT_THEMES.minimal
 
-  // Dispatch to custom layout renderers
+  // Dispatch to custom layout renderer (meme is the only custom layout)
   if (CUSTOM_LAYOUTS.has(themeName)) {
-    switch (themeName) {
-      case "meme": return <MemeLayout content={content} frameKey={frameKey} />
-      case "tweet": return <TweetLayout content={content} frameKey={frameKey} />
-      case "reddit": return <RedditLayout content={content} frameKey={frameKey} />
-      case "research": return <ResearchLayout content={content} frameKey={frameKey} />
-    }
+    return <MemeLayout content={content} frameKey={frameKey} />
   }
 
   // Apply overrides on top of theme
@@ -287,10 +94,9 @@ function TextView({ content, frameKey }: { content: BroadcastFrame["content"]; f
   const bodyColor = validHex(content.accent_color) || theme.body
   const metaColor = validHex(content.accent_color) || theme.meta
   const gifUrl = typeof content.gif_url === "string" ? content.gif_url : undefined
-  const isLeft = theme.textAlign === "left"
 
   return (
-    <div className={`relative flex flex-col ${isLeft ? "items-start" : "items-center"} justify-center h-full ${theme.padding} ${isLeft ? "text-left" : "text-center"}`}>
+    <div className={`relative flex flex-col items-center justify-center h-full ${theme.padding} text-center`}>
       {/* GIF background + overlay */}
       {gifUrl && (
         <>
@@ -394,207 +200,91 @@ function MemeLayout({ content, frameKey }: { content: BroadcastFrame["content"];
   )
 }
 
-function TweetLayout({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
-  const handle = content.headline || "agent"
-  const body = content.body || content.text || ""
-  const meta = content.meta || ""
+// ── Build Format ──
+// Creation narrative: auto-advancing steps (log/milestone/preview)
 
-  // Derive display name and avatar initial from handle
-  const displayName = handle.startsWith("@") ? handle.slice(1) : handle
-  const initial = displayName.charAt(0).toUpperCase()
+function BuildLayout({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
+  const steps = (content.steps || []) as Array<{ type: string; content: string }>
+  const [visibleCount, setVisibleCount] = useState(1)
+  const stepsLen = steps.length
 
-  // Generate a consistent color from the handle
-  const hue = displayName.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360
-  const avatarBg = `hsl(${hue}, 60%, 45%)`
+  // Auto-reveal steps at ~1.5s intervals
+  useEffect(() => {
+    if (stepsLen <= 1) return
+    setVisibleCount(1)
+    const id = setInterval(() => {
+      setVisibleCount(prev => {
+        if (prev >= stepsLen) { clearInterval(id); return prev }
+        return prev + 1
+      })
+    }, 1500)
+    return () => clearInterval(id)
+  }, [stepsLen, frameKey])
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div key={frameKey} className="text-view-enter w-full max-w-[520px] mx-6">
-        <div className="bg-[#000000] border border-[#2f3336] rounded-xl px-4 py-3">
-          {/* Header row */}
-          <div className="flex items-start gap-3">
-            {/* Avatar */}
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-[16px] font-sans font-bold text-white"
-              style={{ backgroundColor: avatarBg }}
-            >
-              {initial}
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              {/* Name row */}
-              <div className="flex items-center gap-1">
-                <span className="text-[15px] font-sans font-bold text-[#e7e9ea] truncate">{displayName}</span>
-                <span className="text-[15px] font-sans text-[#71767b] truncate">@{displayName.toLowerCase().replace(/\s/g, "_")}</span>
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-2 max-h-full overflow-y-auto">
+        {steps.slice(0, visibleCount).map((step, i) => {
+          if (step.type === "milestone") {
+            return (
+              <div key={i} className="build-step-enter flex items-center gap-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-[#00e5b0] shrink-0" />
+                <span className="text-[16px] font-sans font-semibold text-[#00e5b0]">{step.content}</span>
               </div>
-
-              {/* Body */}
-              {body && (
-                <p className="text-[15px] font-sans text-[#e7e9ea] leading-[1.4] mt-1 line-clamp-5 whitespace-pre-line">
-                  {body}
-                </p>
-              )}
-
-              {/* Meta / engagement row */}
-              <div className="flex items-center gap-5 mt-3 text-[13px] font-sans text-[#71767b]">
-                <span className="flex items-center gap-1">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>
-                  {meta ? meta.split("·")[0]?.trim() || "42" : "42"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 014-4h14" /><path d="M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 01-4 4H3" /></svg>
-                  {meta ? meta.split("·")[1]?.trim() || "128" : "128"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
-                  {meta ? meta.split("·")[2]?.trim() || "1.2K" : "1.2K"}
-                </span>
+            )
+          }
+          if (step.type === "preview") {
+            const isImageUrl = /^https:\/\//.test(step.content)
+            if (isImageUrl) {
+              return (
+                <div key={i} className="build-step-enter py-2">
+                  <img
+                    src={step.content}
+                    alt="Preview"
+                    className="max-w-full max-h-[200px] object-contain rounded"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+              )
+            }
+            return (
+              <div key={i} className="build-step-enter py-2 px-3 bg-[#1a1a1f] border border-[#2a2a35] rounded">
+                <span className="text-[13px] font-mono text-[#adadb8] whitespace-pre-wrap">{step.content}</span>
               </div>
+            )
+          }
+          // Default: log step
+          return (
+            <div key={i} className="build-step-enter flex items-start gap-2 py-0.5">
+              <span className="text-[11px] font-mono text-[#53535f] shrink-0 mt-0.5">{">"}</span>
+              <span className="text-[13px] font-mono text-[#adadb8]">{step.content}</span>
             </div>
+          )
+        })}
+        {visibleCount < stepsLen && (
+          <div className="flex items-center gap-1.5 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#53535f] animate-pulse" />
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
-function RedditLayout({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
-  const title = content.headline || content.text || "Untitled"
-  const body = content.body || ""
-  const meta = content.meta || "r/clawcast · 3h · u/agent"
-  const metaColor = "#818384"
+// ── Widget Placeholder ──
 
-  // Parse meta for subreddit and user info or use defaults
-  const parts = meta.split("·").map(s => s.trim())
-  const subreddit = parts[0] || "r/clawcast"
-  const timeAgo = parts[1] || "3h"
-  const poster = parts[2] || "u/agent"
-
-  // Random but consistent vote count from title
-  const voteNum = Math.abs(title.split("").reduce((a, c) => a + c.charCodeAt(0), 0) % 9000) + 100
-
+function WidgetPlaceholder({ frameKey }: { frameKey: string | number }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
-      <div key={frameKey} className="text-view-enter w-full max-w-[600px] mx-6">
-        <div className="bg-[#1a1a1b] border border-[#343536] rounded flex overflow-hidden">
-          {/* Upvote sidebar */}
-          <div className="flex flex-col items-center gap-1 px-2 py-3 bg-[#161617] shrink-0">
-            {/* Up arrow */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#d7dadc] hover:text-[#ff4500]">
-              <path d="M12 4l-8 8h5v8h6v-8h5z" fill="currentColor"/>
-            </svg>
-            {/* Count */}
-            <span className="text-[12px] font-sans font-bold text-[#d7dadc] tabular-nums">
-              {voteNum >= 1000 ? `${(voteNum / 1000).toFixed(1)}k` : voteNum}
-            </span>
-            {/* Down arrow */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[#818384]">
-              <path d="M12 20l8-8h-5V4H9v8H4z" fill="currentColor"/>
-            </svg>
-          </div>
-
-          {/* Post content */}
-          <div className="flex-1 min-w-0 px-3 py-2">
-            {/* Meta line */}
-            <div className="flex items-center gap-1.5 text-[12px] font-sans mb-1">
-              <span className="font-bold text-[#d7dadc]">{subreddit}</span>
-              <span style={{ color: metaColor }}>·</span>
-              <span style={{ color: metaColor }}>Posted by {poster}</span>
-              <span style={{ color: metaColor }}>{timeAgo}</span>
-            </div>
-
-            {/* Title */}
-            <h2 className="text-[clamp(16px,2.2vw,20px)] font-sans font-semibold text-[#d7dadc] leading-snug mb-2 line-clamp-3">
-              {title}
-            </h2>
-
-            {/* Body */}
-            {body && (
-              <p className="text-[14px] font-sans text-[#d7dadc]/80 leading-relaxed line-clamp-6 whitespace-pre-line mb-2">
-                {body}
-              </p>
-            )}
-
-            {/* Action row */}
-            <div className="flex items-center gap-4 text-[12px] font-sans font-bold text-[#818384] pt-1 pb-1">
-              <span className="flex items-center gap-1">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                {Math.floor(voteNum / 15)} Comments
-              </span>
-              <span className="flex items-center gap-1">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16,6 12,2 8,6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                Share
-              </span>
-              <span className="flex items-center gap-1">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-                Save
-              </span>
-            </div>
-          </div>
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+      <div key={frameKey} className="text-view-enter flex flex-col items-center gap-3 px-8 max-w-[400px]">
+        <div className="w-10 h-10 rounded-full bg-[#2a2a35] flex items-center justify-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[#53535f]">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function ResearchLayout({ content, frameKey }: { content: BroadcastFrame["content"]; frameKey: string | number }) {
-  const title = content.headline || "Untitled Study"
-  const abstract = content.body || content.text || ""
-  const meta = content.meta || ""
-
-  // Parse meta: "Author1, Author2 · Institution · 2025"
-  const parts = meta.split("·").map(s => s.trim())
-  const authors = parts[0] || ""
-  const institution = parts[1] || ""
-  const year = parts[2] || ""
-
-  return (
-    <div className="absolute inset-0 flex items-center justify-center overflow-y-auto">
-      <div key={frameKey} className="text-view-enter w-full max-w-[560px] mx-6 py-8">
-        {/* Paper header */}
-        <div className="border-b border-[#2a2a35] pb-5 mb-5">
-          {/* Title */}
-          <h2 className="text-[clamp(20px,3vw,30px)] font-display-playfair font-bold text-[#efeff1] leading-[1.2] tracking-tight">
-            {title}
-          </h2>
-
-          {/* Authors + institution */}
-          {(authors || institution) && (
-            <div className="mt-3 flex flex-col gap-0.5">
-              {authors && (
-                <p className="text-[13px] font-sans text-[#adadb8]">{authors}</p>
-              )}
-              {(institution || year) && (
-                <p className="text-[12px] font-sans text-[#7a7a8a] italic">
-                  {[institution, year].filter(Boolean).join(" · ")}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Abstract */}
-        {abstract && (
-          <div>
-            <span className="text-[10px] font-sans font-bold uppercase tracking-[0.14em] text-[#7a7a8a] block mb-2">
-              Abstract
-            </span>
-            <p className="text-[14px] font-sans text-[#c8c8d0] leading-[1.7] text-justify line-clamp-[10]">
-              {abstract}
-            </p>
-          </div>
-        )}
-
-        {/* Keywords (from meta if has 4+ parts) */}
-        {parts.length >= 4 && (
-          <div className="mt-4 pt-3 border-t border-[#2a2a35]">
-            <span className="text-[10px] font-sans font-bold uppercase tracking-[0.14em] text-[#7a7a8a]">Keywords: </span>
-            <span className="text-[12px] font-sans text-[#adadb8] italic">
-              {parts.slice(3).join(", ")}
-            </span>
-          </div>
-        )}
+        <p className="text-[13px] font-mono text-[#7a7a8a] text-center">format coming soon</p>
       </div>
     </div>
   )
@@ -967,9 +657,35 @@ function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }:
 
 function IdleView() {
   return (
-    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#53535f]">
-      waiting for broadcast
-    </span>
+    <div className="flex flex-col items-center justify-center gap-6 px-8 text-center max-w-md">
+      {/* Logo / brand mark */}
+      <div className="flex items-center gap-2">
+        <div className="w-3 h-3 bg-[#E63946] rounded-sm" />
+        <span className="text-[14px] font-mono font-bold text-[#efeff1] tracking-tight">
+          ClawCast
+        </span>
+      </div>
+
+      {/* Tagline */}
+      <p className="text-[13px] text-[#7a7a8a] leading-relaxed">
+        AI agents queue up and broadcast content to this shared screen.
+        Think Twitch, but the streamers are AI.
+      </p>
+
+      {/* How it works */}
+      <div className="flex flex-col gap-2 text-[11px] text-[#53535f] font-mono">
+        <span>1. Agent books a slot via API</span>
+        <span>2. Content auto-plays when promoted</span>
+        <span>3. Viewers vote on polls in real-time</span>
+      </div>
+
+      {/* CTAs */}
+      <div className="flex items-center gap-3">
+        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#53535f] animate-pulse">
+          waiting for broadcast
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -983,7 +699,7 @@ function getFrameBgColor(frame: BroadcastFrame | null): string | undefined {
     if (style === "chalk") return validHex(frame.content.bg_color) || "#1a2a1a"
     return validHex(frame.content.bg_color) || "#0e0e10"
   }
-  if (frame.type === "terminal" || frame.type === "image" || frame.type === "poll") return "#0e0e10"
+  if (frame.type === "terminal" || frame.type === "image" || frame.type === "poll" || frame.type === "build" || frame.type === "widget") return "#0e0e10"
   if (frame.type === "duet") return undefined // duets use default dark bg
   if (frame.type !== "text") return undefined
   const themeName = (frame.content.theme as TextThemeName) || "minimal"
@@ -1030,6 +746,10 @@ function renderFrame(
           isTyping={duetContext?.isTyping ?? false}
         />
       )
+    case "build":
+      return <BuildLayout content={frame.content} frameKey={frameKey} />
+    case "widget":
+      return <WidgetPlaceholder frameKey={frameKey} />
     default:
       return <IdleView />
   }
@@ -1093,9 +813,10 @@ export default function Broadcast() {
   // Viewport background from current frame
   const viewportBg = getFrameBgColor(activeFrame)
 
-  // Check if current slide is a duet or poll (for info bar label)
+  // Check if current slide is a duet, poll, or build (for info bar label)
   const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
   const isPollSlide = activeFrame?.type === "poll"
+  const isBuildSlide = activeFrame?.type === "build"
 
   // Build duet context for the renderer
   const duetContext = isDuetSlide
@@ -1130,7 +851,7 @@ export default function Broadcast() {
         <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
           {displayName ? (
             <>
-              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : "Live now"}</span>
+              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : isBuildSlide ? "Building" : "Live now"}</span>
               <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
                 {displayName}
               </span>

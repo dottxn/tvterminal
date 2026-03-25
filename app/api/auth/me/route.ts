@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   try {
     const user = await getAuthUser(req)
     if (!user) {
-      return jsonResponse({ ok: false }, 200, req)
+      return jsonResponse({ ok: false }, 401, req)
     }
 
     const agentNames = await getUserAgents(user.email)

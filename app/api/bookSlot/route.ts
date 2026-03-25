@@ -1,13 +1,31 @@
 import { randomBytes } from "crypto"
+import { Redis } from "@upstash/redis"
 import { signSlotJWT } from "@/lib/jwt"
-import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, pushActivity } from "@/lib/kv"
+import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, getQueueLength, setSlotMeta, setPendingBatch, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides } from "@/lib/types"
+import { validateSlides, validateStreamerName, DEPRECATED_THEMES } from "@/lib/types"
+import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { setActivePoll } from "@/lib/kv-poll"
 import type { ActiveSlot, QueuedSlot, SlotMeta, ValidatedSlide } from "@/lib/types"
+
+// Queue cap: max 10 slots in queue
+const MAX_QUEUE_SIZE = 10
+// Per-name booking cooldown: same name can't rebook within 60s
+const BOOKING_COOLDOWN = 60
+
+let redis: Redis | null = null
+function getRedis(): Redis {
+  if (!redis) {
+    redis = new Redis({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
+    })
+  }
+  return redis
+}
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -32,18 +50,33 @@ export async function POST(req: Request) {
       slides?: unknown[]
     }
 
-    if (!streamer_name || typeof streamer_name !== "string" || !/^[\w.-]{1,50}$/.test(streamer_name)) {
-      return jsonResponse({ ok: false, error: "streamer_name required (alphanumeric/underscore/dot/dash, 1-50 chars)" }, 400, req)
+    const nameError = validateStreamerName(streamer_name)
+    if (nameError) {
+      return jsonResponse({ ok: false, error: nameError }, 400, req)
+    }
+    // After validation, streamer_name is guaranteed to be a non-empty string
+    const name = streamer_name as string
+
+    // Per-name booking cooldown: same name can't rebook within 60s
+    const cooldownKey = `tvt:book_rl:${name}`
+    const r = getRedis()
+    const cooldownSet = await r.set(cooldownKey, "1", { nx: true, ex: BOOKING_COOLDOWN })
+    if (cooldownSet !== "OK") {
+      return jsonResponse(
+        { ok: false, error: `${name} just booked. Please wait ${BOOKING_COOLDOWN}s before rebooking.` },
+        429,
+        req,
+      )
     }
 
     // Ownership check: if this name is claimed, require a valid API key
-    const owner = await getAgentOwner(streamer_name)
+    const owner = await getAgentOwner(name)
     if (owner) {
       const apiKey = req.headers.get("x-api-key")
       if (!apiKey) {
         return jsonResponse({ ok: false, error: "This agent name is claimed. Provide x-api-key header." }, 401, req)
       }
-      const valid = await verifyAgentKey(streamer_name, apiKey)
+      const valid = await verifyAgentKey(name, apiKey)
       if (!valid) {
         return jsonResponse({ ok: false, error: "Invalid API key for this agent" }, 403, req)
       }
@@ -68,14 +101,50 @@ export async function POST(req: Request) {
     if (slides && Array.isArray(slides) && slides.length > 0) {
       const result = validateSlides(slides)
       if ("error" in result) {
+        logValidationError({
+          timestamp: Date.now(),
+          endpoint: "bookSlot",
+          agent_name: name,
+          error_type: "slide_validation",
+          error_message: result.error,
+          attempted_value: JSON.stringify(slides).slice(0, 200),
+        }).catch(() => {})
         return jsonResponse({ ok: false, error: result.error }, 400, req)
       }
       validatedSlides = result.slides
       batchTotalDuration = result.totalDuration
+
+      // Log deprecated theme usage (fire-and-forget)
+      for (const slide of validatedSlides) {
+        if (slide.type === "text") {
+          const theme = (slide.content as Record<string, unknown>).theme
+          if (typeof theme === "string" && DEPRECATED_THEMES.has(theme)) {
+            logDeprecatedFormat(theme).catch(() => {})
+            logValidationError({
+              timestamp: Date.now(),
+              endpoint: "bookSlot",
+              agent_name: name,
+              error_type: "deprecated_theme",
+              error_message: `Theme "${theme}" is deprecated — falls back to minimal`,
+              attempted_value: theme,
+            }).catch(() => {})
+          }
+        }
+      }
     }
 
     // Ensure state is current
     await checkAndTransitionSlots()
+
+    // Queue cap: reject if queue is full
+    const queueLen = await getQueueLength()
+    if (queueLen >= MAX_QUEUE_SIZE) {
+      return jsonResponse(
+        { ok: false, error: `Queue is full (${MAX_QUEUE_SIZE} agents). Try again shortly.` },
+        429,
+        req,
+      )
+    }
 
     // Generate slot ID
     const slotId = `slot_${Date.now()}_${randomBytes(4).toString("hex")}`
@@ -109,12 +178,12 @@ export async function POST(req: Request) {
 
     // Create JWT with 60s grace period past slot end
     const jwtExpiry = Math.floor(slotEnd.getTime() / 1000) + 60
-    const jwt = await signSlotJWT(slotId, streamer_name, jwtExpiry)
+    const jwt = await signSlotJWT(slotId, name, jwtExpiry)
 
     // Store slot meta
     const meta: SlotMeta = {
       slot_id: slotId,
-      streamer_name,
+      streamer_name: name,
       streamer_url,
       duration_minutes: duration,
       status: isImmediate ? "active" : "queued",
@@ -126,7 +195,7 @@ export async function POST(req: Request) {
     const response: Record<string, unknown> = {
       ok: true,
       slot_jwt: jwt,
-      streamer_name,
+      streamer_name: name,
       position_in_queue: isImmediate ? 0 : queue.length + 1,
       scheduled_start: scheduledStart.toISOString(),
       slot_end: slotEnd.toISOString(),
@@ -138,7 +207,7 @@ export async function POST(req: Request) {
       // Start broadcasting now
       const active: ActiveSlot = {
         slot_id: slotId,
-        streamer_name,
+        streamer_name: name,
         streamer_url,
         started_at: now.toISOString(),
         slot_end: slotEnd.toISOString(),
@@ -148,7 +217,7 @@ export async function POST(req: Request) {
 
       try {
         await publishToLive("slot_start", {
-          streamer_name,
+          streamer_name: name,
           streamer_url,
           slot_end: slotEnd.toISOString(),
           type: "terminal",
@@ -209,7 +278,7 @@ export async function POST(req: Request) {
       // Queue it
       const queued: QueuedSlot = {
         slot_id: slotId,
-        streamer_name,
+        streamer_name: name,
         streamer_url,
         duration_minutes: duration,
         scheduled_start: scheduledStart.toISOString(),
@@ -229,8 +298,8 @@ export async function POST(req: Request) {
     // Publish activity entry
     try {
       const activityText = isImmediate ? "signed up and went live" : "signed up for the queue"
-      await publishToChat("msg", { name: streamer_name, text: activityText, source: "system" })
-      await pushActivity({ name: streamer_name, text: activityText, timestamp: Date.now() })
+      await publishToChat("msg", { name, text: activityText, source: "system" })
+      await pushActivity({ name, text: activityText, timestamp: Date.now() })
     } catch {
       // Best-effort — don't fail the booking for an activity message
     }
@@ -238,7 +307,7 @@ export async function POST(req: Request) {
     // Track stats for owned agents
     if (owner) {
       const slideCount = validatedSlides ? validatedSlides.length : 0
-      await incrementAgentStats(streamer_name, slideCount)
+      await incrementAgentStats(name, slideCount)
     }
 
     return jsonResponse(response, 200, req)

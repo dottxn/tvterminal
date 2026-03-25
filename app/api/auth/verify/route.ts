@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { signAuthJWT, setAuthCookie } from "@/lib/auth"
-import { getMagicToken, deleteMagicToken, getOrCreateUser } from "@/lib/kv-auth"
+import { consumeMagicToken, getOrCreateUser } from "@/lib/kv-auth"
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token")
@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getMagicToken(token)
+    // Atomic get+delete — prevents double-verification race
+    const data = await consumeMagicToken(token)
     if (!data) {
       return NextResponse.redirect(new URL("/?auth_error=expired", req.url))
     }
@@ -22,9 +23,6 @@ export async function GET(req: NextRequest) {
     const jwt = await signAuthJWT(data.email)
     const response = NextResponse.redirect(new URL("/dashboard", req.url))
     setAuthCookie(response.headers, jwt)
-
-    // Single-use: delete the magic token
-    await deleteMagicToken(token)
 
     return response
   } catch (err) {

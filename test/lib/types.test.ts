@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   validateImageUrl,
   validatePollContent,
+  validateBuildContent,
   validateSlides,
   ALLOWED_IMAGE_DOMAINS,
   MAX_SLIDES,
@@ -104,6 +105,68 @@ describe("validatePollContent", () => {
     expect(
       validatePollContent({ question: "Q?", options: ["A", "x".repeat(101)] })
     ).toMatch(/option 1 must be a string/);
+  });
+});
+
+// ── validateBuildContent ──
+
+describe("validateBuildContent", () => {
+  it("accepts valid build content", () => {
+    expect(
+      validateBuildContent({
+        steps: [
+          { type: "log", content: "$ npm install" },
+          { type: "milestone", content: "Dependencies installed ✓" },
+          { type: "preview", content: "https://i.imgur.com/abc.png" },
+        ],
+      })
+    ).toBeNull();
+  });
+
+  it("accepts single step", () => {
+    expect(
+      validateBuildContent({ steps: [{ type: "log", content: "hello" }] })
+    ).toBeNull();
+  });
+
+  it("rejects empty steps array", () => {
+    expect(validateBuildContent({ steps: [] })).toMatch(/build steps required/);
+  });
+
+  it("rejects missing steps", () => {
+    expect(validateBuildContent({})).toMatch(/build steps required/);
+  });
+
+  it("rejects more than 10 steps", () => {
+    const steps = Array.from({ length: 11 }, () => ({
+      type: "log",
+      content: "x",
+    }));
+    expect(validateBuildContent({ steps })).toMatch(/build steps required/);
+  });
+
+  it("rejects invalid step type", () => {
+    expect(
+      validateBuildContent({ steps: [{ type: "invalid", content: "x" }] })
+    ).toMatch(/type must be one of/);
+  });
+
+  it("rejects missing step content", () => {
+    expect(
+      validateBuildContent({ steps: [{ type: "log" }] })
+    ).toMatch(/content string required/);
+  });
+
+  it("rejects empty step content", () => {
+    expect(
+      validateBuildContent({ steps: [{ type: "log", content: "" }] })
+    ).toMatch(/content string required/);
+  });
+
+  it("rejects non-object step", () => {
+    expect(
+      validateBuildContent({ steps: ["not an object"] })
+    ).toMatch(/must be an object/);
   });
 });
 
@@ -215,5 +278,29 @@ describe("validateSlides", () => {
         DEFAULT_SLIDE_DURATION.text + DEFAULT_SLIDE_DURATION.image
       );
     }
+  });
+
+  it("validates build slide with default duration", () => {
+    const buildSlide = {
+      type: "build",
+      content: {
+        steps: [
+          { type: "log", content: "$ npm install" },
+          { type: "milestone", content: "Done ✓" },
+        ],
+      },
+    };
+    const result = validateSlides([buildSlide]);
+    expect("slides" in result).toBe(true);
+    if ("slides" in result) {
+      expect(result.slides[0].duration_seconds).toBe(DEFAULT_SLIDE_DURATION.build);
+    }
+  });
+
+  it("rejects build slide with invalid content", () => {
+    const result = validateSlides([
+      { type: "build", content: { steps: [] } },
+    ]);
+    expect("error" in result).toBe(true);
   });
 });

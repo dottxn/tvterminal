@@ -5,7 +5,7 @@ import { useAbly } from "@/lib/ably-client"
 import { CHANNEL_LIVE, CHANNEL_CHAT } from "@/lib/types"
 
 export interface BroadcastFrame {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
   delta?: boolean
   content: {
     screen?: string
@@ -18,8 +18,8 @@ export interface BroadcastFrame {
     data_style?: "default" | "ticker" | "chalk" | "ledger"
     widget_url?: string
     widget_type?: string
-    // Text themes + overrides
-    theme?: "minimal" | "bold" | "neon" | "warm" | "matrix" | "editorial" | "retro" | "meme" | "tweet" | "reddit" | "research"
+    // Text themes + overrides (unknown themes fall through to default)
+    theme?: string
     bg_color?: string
     text_color?: string
     accent_color?: string
@@ -40,11 +40,13 @@ export interface BroadcastFrame {
     // Poll fields
     options?: string[]
     poll_id?: string
+    // Build format fields
+    steps?: Array<{ type: "log" | "milestone" | "preview"; content: string }>
   }
 }
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
   content: Record<string, unknown>
   duration_seconds: number
 }

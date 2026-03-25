@@ -18,3 +18,15 @@ node_modules/
 .gstack/
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Legacy static site (pre-Next.js)
+ARCHITECTURE.md
+index.html
+assets/
+css/
+recipes/
+
+# Utility scripts (not part of app)
+scripts/duet_runner.py
+scripts/sys_pulse_stream.py
+scripts/test-lock.ts

@@ -41,7 +41,7 @@ export interface SlotJWTPayload {
 // ── Batch Broadcasting ──
 
 export interface BatchSlide {
-  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll"
+  type: "terminal" | "text" | "data" | "widget" | "duet" | "image" | "poll" | "build"
   content: Record<string, unknown>
   duration_seconds?: number
 }
@@ -61,6 +61,7 @@ export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
   duet: 6,
   image: 8,
   poll: 15,
+  build: 15,
 }
 
 export const MAX_SLIDES = 10
@@ -68,7 +69,45 @@ export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
 export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide/frame
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet", "image", "poll"])
+const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "duet", "image", "poll", "build"])
+
+// Themes removed in the mood-theme cleanup. Used for deprecation logging only.
+export const DEPRECATED_THEMES = new Set([
+  "bold", "neon", "warm", "matrix", "editorial", "retro",
+  "tweet", "reddit", "research",
+])
+
+// ── Observability Types ──
+
+export interface SlideMetadata {
+  type: string
+  theme?: string
+  duration: number
+  char_count?: number
+  row_count?: number
+  option_count?: number
+  step_count?: number
+  image_domain?: string
+}
+
+export interface BroadcastContentMetadata {
+  slot_id: string
+  streamer_name: string
+  slides: SlideMetadata[]
+  format_usage: Record<string, number>
+  theme_usage: Record<string, number>
+  total_duration: number
+  ended_at: string
+}
+
+export interface ValidationErrorEntry {
+  timestamp: number
+  endpoint: string
+  agent_name: string
+  error_type: string
+  error_message: string
+  attempted_value?: string // sanitized, max 200 chars
+}
 
 // ── Image URL Allowlist ──
 export const ALLOWED_IMAGE_DOMAINS = new Set([
@@ -104,6 +143,29 @@ export function validatePollContent(content: Record<string, unknown>): string | 
   for (let i = 0; i < options.length; i++) {
     if (typeof options[i] !== "string" || (options[i] as string).length < 1 || (options[i] as string).length > 100) {
       return `poll option ${i} must be a string (1-100 chars)`
+    }
+  }
+  return null
+}
+
+const VALID_BUILD_STEP_TYPES = new Set(["log", "milestone", "preview"])
+
+/** Validate build content structure. Returns error string or null on success. */
+export function validateBuildContent(content: Record<string, unknown>): string | null {
+  const { steps } = content
+  if (!Array.isArray(steps) || steps.length < 1 || steps.length > 10) {
+    return "build steps required (array, 1-10 items)"
+  }
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i] as Record<string, unknown>
+    if (!step || typeof step !== "object") {
+      return `build step ${i}: must be an object`
+    }
+    if (typeof step.type !== "string" || !VALID_BUILD_STEP_TYPES.has(step.type)) {
+      return `build step ${i}: type must be one of: log, milestone, preview`
+    }
+    if (typeof step.content !== "string" || step.content.length < 1) {
+      return `build step ${i}: content string required`
     }
   }
   return null
@@ -159,6 +221,12 @@ export function validateSlides(
         return { error: `Slide ${i}: ${pollError}` }
       }
     }
+    if (slide.type === "build") {
+      const buildError = validateBuildContent(slide.content)
+      if (buildError) {
+        return { error: `Slide ${i}: ${buildError}` }
+      }
+    }
 
     const defaultDuration = DEFAULT_SLIDE_DURATION[slide.type] ?? 8
     const duration = Math.min(MAX_SLIDE_DURATION, Math.max(MIN_SLIDE_DURATION, Math.round(slide.duration_seconds ?? defaultDuration)))
@@ -198,3 +266,29 @@ export interface ActivityEntry {
 }
 
 export const DEFAULT_DUET_SLIDE_DURATION = 6 // seconds per turn
+
+// ── Streamer Name Validation ──
+
+const NAME_RE = /^[a-zA-Z0-9_.\-]{1,50}$/
+
+/** Validate a streamer name. Returns error string or null on success. */
+export function validateStreamerName(name: unknown): string | null {
+  if (!name || typeof name !== "string") {
+    return "streamer_name required (string)"
+  }
+  if (!NAME_RE.test(name)) {
+    return "streamer_name must be 1-50 chars: letters, numbers, underscore, dot, hyphen"
+  }
+  return null
+}
+
+// ── Broadcast Summary (for history) ──
+
+export interface BroadcastSummary {
+  slot_id: string
+  start_time: string
+  end_time: string
+  slide_count: number
+  peak_viewers: number
+  total_votes: number
+}

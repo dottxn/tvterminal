@@ -1,8 +1,56 @@
-import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock, pushActivity, getPeakViewers } from "./kv"
+import { getActiveSlot, clearActiveSlot, popFromQueue, setActiveSlot, setSlotMeta, getSlotMeta, getLastFrameTime, getFrameCount, getBatchMode, setBatchMode, setBatchSlides, incrementFrameCount, setLastFrameType, setLastFrameTime, getPendingBatch, deletePendingBatch, acquireTransitionLock, releaseTransitionLock, pushActivity, getPeakViewers, getBatchSlides, saveBroadcastContent } from "./kv"
 import { publishToLive } from "./ably-server"
-import type { ActiveSlot, ValidatedSlide } from "./types"
-import { getAgentOwner, updateAgentStreamStats } from "./kv-auth"
+import type { ActiveSlot, ValidatedSlide, BroadcastContentMetadata, SlideMetadata } from "./types"
+import { getAgentOwner, updateAgentStreamStats, addBroadcastHistory } from "./kv-auth"
 import { getSlotTotalVotes, setActivePoll } from "./kv-poll"
+
+/** Extract structural metadata from batch slides (no full content stored). */
+function extractContentMetadata(slides: ValidatedSlide[], slotId: string, streamerName: string): BroadcastContentMetadata {
+  const formatUsage: Record<string, number> = {}
+  const themeUsage: Record<string, number> = {}
+  let totalDuration = 0
+
+  const slideMetadata: SlideMetadata[] = slides.map(slide => {
+    const content = slide.content as Record<string, unknown>
+    formatUsage[slide.type] = (formatUsage[slide.type] ?? 0) + 1
+    totalDuration += slide.duration_seconds
+
+    const meta: SlideMetadata = { type: slide.type, duration: slide.duration_seconds }
+
+    if (slide.type === "text") {
+      const theme = (content.theme as string) ?? "minimal"
+      themeUsage[theme] = (themeUsage[theme] ?? 0) + 1
+      meta.theme = theme
+      const body = (content.body as string) ?? ""
+      const headline = (content.headline as string) ?? ""
+      meta.char_count = headline.length + body.length
+    }
+    if (slide.type === "data") {
+      meta.row_count = Array.isArray(content.rows) ? content.rows.length : 0
+    }
+    if (slide.type === "poll") {
+      meta.option_count = Array.isArray(content.options) ? content.options.length : 0
+    }
+    if (slide.type === "build") {
+      meta.step_count = Array.isArray(content.steps) ? content.steps.length : 0
+    }
+    if (slide.type === "image" && typeof content.image_url === "string") {
+      try { meta.image_domain = new URL(content.image_url).hostname } catch { /* skip */ }
+    }
+
+    return meta
+  })
+
+  return {
+    slot_id: slotId,
+    streamer_name: streamerName,
+    slides: slideMetadata,
+    format_usage: formatUsage,
+    theme_usage: themeUsage,
+    total_duration: totalDuration,
+    ended_at: new Date().toISOString(),
+  }
+}
 
 // Cut off agents who book a slot but don't broadcast anything
 // 30s gives queued agents enough time to discover they've been promoted
@@ -101,15 +149,37 @@ export async function endSlot(slot: ActiveSlot): Promise<void> {
     await setSlotMeta(slot.slot_id, meta)
   }
 
-  // Collect post-stream stats for owned agents
+  // Capture broadcast content metadata for ALL agents (not just owned)
+  try {
+    const batchData = await getBatchSlides(slot.slot_id)
+    if (batchData?.slides && Array.isArray(batchData.slides) && batchData.slides.length > 0) {
+      const metadata = extractContentMetadata(batchData.slides as ValidatedSlide[], slot.slot_id, slot.streamer_name)
+      await saveBroadcastContent(slot.slot_id, metadata)
+    }
+  } catch (err) {
+    console.error("[slot-lifecycle] Failed to save broadcast content metadata:", err)
+  }
+
+  // Collect post-stream stats for owned agents + write broadcast history
   try {
     const owner = await getAgentOwner(slot.streamer_name)
     if (owner) {
-      const [peakViewers, totalVotes] = await Promise.all([
+      const [peakViewers, totalVotes, frameCount] = await Promise.all([
         getPeakViewers(slot.slot_id),
         getSlotTotalVotes(slot.slot_id),
+        getFrameCount(slot.slot_id),
       ])
-      await updateAgentStreamStats(slot.streamer_name, peakViewers, totalVotes)
+      await Promise.all([
+        updateAgentStreamStats(slot.streamer_name, peakViewers, totalVotes),
+        addBroadcastHistory(slot.streamer_name, {
+          slot_id: slot.slot_id,
+          start_time: slot.started_at,
+          end_time: new Date().toISOString(),
+          slide_count: frameCount,
+          peak_viewers: peakViewers,
+          total_votes: totalVotes,
+        }),
+      ])
     }
   } catch (err) {
     console.error("[slot-lifecycle] Failed to update stream stats:", err)

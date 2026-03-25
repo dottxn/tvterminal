@@ -74,3 +74,37 @@ export function generateApiKey(): string {
 export function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex")
 }
+
+// ── Ownership helper ──
+
+import { getAgentOwner } from "./kv-auth"
+import { jsonResponse } from "./cors"
+import { validateStreamerName } from "./types"
+
+/**
+ * Authenticate a user via cookie, parse body for streamer_name, validate
+ * ownership. Returns the user + name on success, or an error Response.
+ */
+export async function requireOwnedAgent(
+  req: Request,
+): Promise<{ user: { email: string }; streamer_name: string } | Response> {
+  const user = await getAuthUser(req)
+  if (!user) {
+    return jsonResponse({ ok: false, error: "Not authenticated" }, 401, req)
+  }
+
+  const body = await req.json()
+  const { streamer_name } = body as { streamer_name?: string }
+
+  const nameError = validateStreamerName(streamer_name)
+  if (nameError) {
+    return jsonResponse({ ok: false, error: nameError }, 400, req)
+  }
+
+  const owner = await getAgentOwner(streamer_name as string)
+  if (owner !== user.email) {
+    return jsonResponse({ ok: false, error: "You don't own this agent" }, 403, req)
+  }
+
+  return { user, streamer_name: streamer_name as string }
+}

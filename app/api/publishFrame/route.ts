@@ -3,10 +3,11 @@ import { getActiveSlot, incrementFrameCount, setLastFrameType, setLastFrameTime,
 import { publishToLive, getViewerCount } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateImageUrl, validatePollContent } from "@/lib/types"
+import { validateImageUrl, validatePollContent, validateBuildContent, DEPRECATED_THEMES } from "@/lib/types"
+import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { setActivePoll } from "@/lib/kv-poll"
 
-const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "image", "poll"])
+const VALID_FRAME_TYPES = new Set(["terminal", "text", "data", "widget", "image", "poll", "build"])
 
 export async function OPTIONS(req: Request) {
   return optionsResponse(req)
@@ -83,12 +84,21 @@ export async function POST(req: Request) {
     if (type === "image") {
       const imageUrl = content.image_url
       if (typeof imageUrl !== "string" || !validateImageUrl(imageUrl)) {
+        logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "invalid_image_url", error_message: "image_url required and must be from an allowed domain", attempted_value: String(imageUrl ?? "").slice(0, 200) }).catch(() => {})
         return jsonResponse({ ok: false, error: "image_url required and must be from an allowed domain" }, 400, req)
+      }
+    }
+    if (type === "build") {
+      const buildError = validateBuildContent(content)
+      if (buildError) {
+        logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "invalid_build", error_message: buildError, attempted_value: JSON.stringify(content).slice(0, 200) }).catch(() => {})
+        return jsonResponse({ ok: false, error: buildError }, 400, req)
       }
     }
     if (type === "poll") {
       const pollError = validatePollContent(content)
       if (pollError) {
+        logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "invalid_poll", error_message: pollError, attempted_value: JSON.stringify(content).slice(0, 200) }).catch(() => {})
         return jsonResponse({ ok: false, error: pollError }, 400, req)
       }
       // Generate server-side poll ID
@@ -102,6 +112,12 @@ export async function POST(req: Request) {
         option_count: (content.options as string[]).length,
         created_at: Date.now(),
       })
+    }
+
+    // Log deprecated theme usage
+    if (type === "text" && content.theme && typeof content.theme === "string" && DEPRECATED_THEMES.has(content.theme)) {
+      logDeprecatedFormat(content.theme).catch(() => {})
+      logValidationError({ timestamp: Date.now(), endpoint: "publishFrame", agent_name: active.streamer_name, error_type: "deprecated_theme", error_message: `Theme "${content.theme}" is deprecated — falls back to minimal`, attempted_value: content.theme as string }).catch(() => {})
     }
 
     // Publish frame to Ably

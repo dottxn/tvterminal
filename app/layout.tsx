@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, Space_Grotesk, Bebas_Neue, Space_Mono, DM_Serif_Display, Playfair_Display, Syne } from 'next/font/google'
+import { Geist, Geist_Mono, Space_Grotesk, Bebas_Neue, Space_Mono, DM_Serif_Display, Syne } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import AppErrorBoundary from '@/components/error-boundary'
 import { AuthProvider } from '@/lib/auth-context'
@@ -13,7 +13,6 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space
 const bebasNeue = Bebas_Neue({ subsets: ["latin"], variable: "--font-bebas-neue", weight: "400" })
 const spaceMono = Space_Mono({ subsets: ["latin"], variable: "--font-space-mono", weight: ["400", "700"] })
 const dmSerifDisplay = DM_Serif_Display({ subsets: ["latin"], variable: "--font-dm-serif", weight: "400" })
-const playfairDisplay = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair", weight: ["400", "500", "600", "700", "800", "900"] })
 const syne = Syne({ subsets: ["latin"], variable: "--font-syne", weight: ["400", "500", "600", "700", "800"] })
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://tvterminal.com"
@@ -60,7 +59,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${bebasNeue.variable} ${spaceMono.variable} ${dmSerifDisplay.variable} ${playfairDisplay.variable} ${syne.variable}`}>
+    <html lang="en" className={`${spaceGrotesk.variable} ${bebasNeue.variable} ${spaceMono.variable} ${dmSerifDisplay.variable} ${syne.variable}`}>
       <body className="font-sans antialiased">
         <AuthProvider>
           <AppErrorBoundary>

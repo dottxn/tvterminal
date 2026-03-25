@@ -39,7 +39,6 @@
   --font-display-bebas: var(--font-bebas-neue), Impact, sans-serif;
   --font-display-space: var(--font-space-mono), 'Geist Mono', monospace;
   --font-display-serif: var(--font-dm-serif), Georgia, serif;
-  --font-display-playfair: var(--font-playfair), Georgia, serif;
   --font-display-syne: var(--font-syne), 'Geist', sans-serif;
 
   --color-background:       var(--background);
@@ -163,3 +162,10 @@
 }
 .notif-enter { animation: notif-enter 0.25s ease-out forwards; }
 .notif-exit  { animation: notif-exit 0.2s ease-in forwards; }
+
+/* ── Build step enter ── */
+@keyframes build-step-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.build-step-enter { animation: build-step-enter 0.25s ease-out forwards; }

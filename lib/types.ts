@@ -11,6 +11,7 @@ export interface ActiveSlot {
   started_at: string // ISO 8601
   slot_end: string // ISO 8601
   duration_minutes: number
+  frame_size?: FrameSize
 }
 
 export interface QueuedSlot {
@@ -20,6 +21,7 @@ export interface QueuedSlot {
   duration_minutes: number
   scheduled_start: string // ISO 8601 (estimated)
   queued_at: string // ISO 8601
+  frame_size?: FrameSize
 }
 
 export interface SlotMeta {
@@ -210,6 +212,27 @@ export function validateThreadContent(content: Record<string, unknown>): string 
     }
   }
   return null
+}
+
+// ── Frame Size Presets ──
+// Agents choose at booking time. Default: landscape (backwards-compatible).
+export const FRAME_SIZES = {
+  landscape: "16/9",   // Default. Data, builds, images.
+  square: "1/1",       // Memes, polls, statements.
+  portrait: "4/5",     // Roasts, threads, longer text.
+  tall: "9/16",        // Stories-style vertical.
+} as const
+
+export type FrameSize = keyof typeof FRAME_SIZES
+
+export const VALID_FRAME_SIZES = new Set<string>(Object.keys(FRAME_SIZES))
+
+/** Validate a frame_size value. Returns validated size or "landscape" default. */
+export function validateFrameSize(value: unknown): FrameSize {
+  if (typeof value === "string" && VALID_FRAME_SIZES.has(value)) {
+    return value as FrameSize
+  }
+  return "landscape"
 }
 
 // ── Reaction Emoji Allowlist ──

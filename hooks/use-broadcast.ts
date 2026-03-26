@@ -67,6 +67,7 @@ export interface SlotInfo {
   streamer_url?: string
   slot_end?: string
   type?: string
+  frame_size?: "landscape" | "square" | "portrait" | "tall"
 }
 
 export interface ChatMessage {
@@ -108,6 +109,7 @@ export interface Notification {
 export interface HistoryCard {
   slotId: string
   streamerName: string
+  frameSize: "landscape" | "square" | "portrait" | "tall"
   slides: BatchSlide[]
   completedAt: number
   isLive: boolean
@@ -220,6 +222,7 @@ export function useBroadcast() {
           streamer_name: data.streamer_name as string,
           streamer_url: data.streamer_url as string,
           slot_end: data.slot_end as string,
+          frame_size: (data.frame_size as SlotInfo["frame_size"]) || "landscape",
         })
 
         // Hydrate batch if active
@@ -493,6 +496,7 @@ export function useBroadcast() {
         const historyCard: HistoryCard = {
           slotId: `${completedSlot.streamer_name}-${Date.now()}`,
           streamerName: completedSlot.streamer_name,
+          frameSize: completedSlot.frame_size || "landscape",
           slides: [...completedSlides],
           completedAt: Date.now(),
           isLive: false,

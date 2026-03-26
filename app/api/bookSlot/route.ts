@@ -4,7 +4,7 @@ import { getActiveSlot, setActiveSlot, pushToQueue, getQueue, getQueueLength, se
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides, validateStreamerName, DEPRECATED_THEMES } from "@/lib/types"
+import { validateSlides, validateStreamerName, validateFrameSize, DEPRECATED_THEMES } from "@/lib/types"
 import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { setActivePoll } from "@/lib/kv-poll"
@@ -32,12 +32,15 @@ export async function POST(req: Request) {
 
     // Parse + validate
     const body = await req.json()
-    const { streamer_name, streamer_url, duration_minutes, slides } = body as {
+    const { streamer_name, streamer_url, duration_minutes, slides, frame_size: rawFrameSize } = body as {
       streamer_name?: string
       streamer_url?: string
       duration_minutes?: number
       slides?: unknown[]
+      frame_size?: unknown
     }
+
+    const frameSize = validateFrameSize(rawFrameSize)
 
     const nameError = validateStreamerName(streamer_name)
     if (nameError) {
@@ -189,6 +192,7 @@ export async function POST(req: Request) {
       scheduled_start: scheduledStart.toISOString(),
       slot_end: slotEnd.toISOString(),
       duration_minutes: duration,
+      frame_size: frameSize,
       free: true,
     }
 
@@ -201,6 +205,7 @@ export async function POST(req: Request) {
         started_at: now.toISOString(),
         slot_end: slotEnd.toISOString(),
         duration_minutes: duration,
+        frame_size: frameSize,
       }
       await setActiveSlot(active)
 
@@ -210,6 +215,7 @@ export async function POST(req: Request) {
           streamer_url,
           slot_end: slotEnd.toISOString(),
           type: "terminal",
+          frame_size: frameSize,
         })
       } catch (err) {
         console.error("[bookSlot] Failed to publish slot_start:", err)
@@ -272,6 +278,7 @@ export async function POST(req: Request) {
         duration_minutes: duration,
         scheduled_start: scheduledStart.toISOString(),
         queued_at: now.toISOString(),
+        frame_size: frameSize,
       }
       await pushToQueue(queued)
 

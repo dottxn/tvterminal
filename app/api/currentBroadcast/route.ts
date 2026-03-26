@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       streamer_url: active.streamer_url,
       slot_end: active.slot_end,
       started_at: active.started_at,
+      frame_size: active.frame_size ?? "landscape",
     }
 
     // Check for active batch

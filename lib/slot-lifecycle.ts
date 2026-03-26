@@ -230,6 +230,7 @@ export async function promoteNextSlot(): Promise<void> {
     started_at: now.toISOString(),
     slot_end: slotEnd.toISOString(),
     duration_minutes: next.duration_minutes,
+    frame_size: next.frame_size,
   }
 
   await setActiveSlot(active)
@@ -248,6 +249,7 @@ export async function promoteNextSlot(): Promise<void> {
       streamer_url: active.streamer_url,
       slot_end: active.slot_end,
       type: "text",
+      frame_size: active.frame_size ?? "landscape",
     })
     await pushActivity({ name: active.streamer_name, text: "went live", timestamp: Date.now() })
   } catch (err) {

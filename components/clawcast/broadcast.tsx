@@ -4,7 +4,15 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import DOMPurify from "isomorphic-dompurify"
 import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction, HistoryCard } from "@/hooks/use-broadcast"
-import { ALLOWED_REACTION_EMOJI } from "@/lib/types"
+import { ALLOWED_REACTION_EMOJI, FRAME_SIZES, type FrameSize } from "@/lib/types"
+
+// Desktop width classes per frame size (narrower cards centered, Porto Rocha style)
+const FRAME_SIZE_WIDTH: Record<FrameSize, string> = {
+  landscape: "max-w-[640px]",
+  square: "max-w-[480px]",
+  portrait: "max-w-[420px]",
+  tall: "max-w-[360px]",
+}
 
 // ── Hex color validation ──
 const HEX_RE = /^#[0-9a-fA-F]{3,8}$/
@@ -1037,6 +1045,7 @@ function FeedCard({
   batchIndex,
   reactions,
   react: onReact,
+  frameSize = "landscape",
 }: {
   activeFrame: BroadcastFrame | null
   frameKey: string | number
@@ -1052,11 +1061,14 @@ function FeedCard({
   batchIndex: number
   reactions: FloatingReaction[]
   react: (emoji: string) => Promise<void>
+  frameSize?: FrameSize
 }) {
   const viewportBg = getFrameBgColor(activeFrame)
+  const maxWidth = FRAME_SIZE_WIDTH[frameSize]
+  const aspectRatio = FRAME_SIZES[frameSize]
 
   return (
-    <div className="w-full max-w-[640px] mx-auto">
+    <div className={`w-full ${maxWidth} mx-auto`}>
 
       {/* Card header — minimal */}
       <div className="flex items-center gap-3 px-1 py-3">
@@ -1085,10 +1097,13 @@ function FeedCard({
         </div>
       </div>
 
-      {/* Card viewport — aspect ratio container */}
+      {/* Card viewport — variable aspect ratio based on frame size */}
       <div
-        className="relative w-full aspect-video overflow-hidden transition-colors duration-300"
-        style={viewportBg ? { backgroundColor: viewportBg } : { backgroundColor: "#0e0e10" }}
+        className="relative w-full overflow-hidden transition-colors duration-300"
+        style={{
+          aspectRatio,
+          backgroundColor: viewportBg || "#0e0e10",
+        }}
       >
         {activeFrame ? (
           renderFrame(activeFrame, frameKey, duetContext, pollContext)
@@ -1300,11 +1315,15 @@ function HistoryFeedCard({ card }: { card: HistoryCard }) {
     ? getFrameBgColor({ type: displaySlide.type as BroadcastFrame["type"], content: displaySlide.content as BroadcastFrame["content"] })
     : undefined
 
+  const frameSize = card.frameSize || "landscape"
+  const maxWidth = FRAME_SIZE_WIDTH[frameSize]
+  const aspectRatio = FRAME_SIZES[frameSize]
+
   // Timestamp
   const timeAgo = formatTimeAgo(card.completedAt)
 
   return (
-    <div className="w-full max-w-[640px] mx-auto opacity-70 hover:opacity-90 transition-opacity duration-200">
+    <div className={`w-full ${maxWidth} mx-auto opacity-70 hover:opacity-90 transition-opacity duration-200`}>
       {/* Card header */}
       <div className="flex items-center gap-3 px-1 py-3">
         <span className="w-[7px] h-[7px] rounded-full shrink-0 bg-[#2a2a35]" />
@@ -1317,10 +1336,10 @@ function HistoryFeedCard({ card }: { card: HistoryCard }) {
         </div>
       </div>
 
-      {/* Card viewport */}
+      {/* Card viewport — variable aspect ratio */}
       <div
-        className="relative w-full aspect-video overflow-hidden"
-        style={{ backgroundColor: viewportBg || "#0e0e10" }}
+        className="relative w-full overflow-hidden"
+        style={{ aspectRatio, backgroundColor: viewportBg || "#0e0e10" }}
       >
         {hasDuet ? (
           <FrozenDuetLayout slides={card.slides} />
@@ -1415,6 +1434,8 @@ export default function Broadcast() {
     ? currentSlot.streamer_name
     : liveInfo?.streamer_name || null
 
+  const currentFrameSize: FrameSize = (currentSlot?.frame_size as FrameSize) || "landscape"
+
   // Scroll tracking
   useEffect(() => {
     const feedEl = feedRef.current
@@ -1474,6 +1495,7 @@ export default function Broadcast() {
           batchIndex={batchIndex}
           reactions={reactions}
           react={react}
+          frameSize={currentFrameSize}
         />
 
         {/* History cards */}

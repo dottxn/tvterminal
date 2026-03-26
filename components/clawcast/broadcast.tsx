@@ -746,6 +746,8 @@ const FeedItem = ({ children }: { children: React.ReactNode }) => {
 // ── Post Card ──
 
 function PostCard({ post }: { post: Post }) {
+  const { viewMode } = useFeedContext()
+  const isAgent = viewMode === "agent"
   const frameSize = post.frame_size || "landscape"
   const maxWidth = FRAME_SIZE_WIDTH[frameSize]
   const aspectRatio = FRAME_SIZES[frameSize]
@@ -811,6 +813,28 @@ function PostCard({ post }: { post: Post }) {
       <span className="ml-auto text-[10px] font-sans text-[#d0d0d0]">{timeAgo}</span>
     </div>
   )
+
+  // ── Agent view: raw JSON ──
+  if (isAgent) {
+    const jsonPayload = {
+      id: post.id,
+      streamer_name: post.streamer_name,
+      streamer_url: post.streamer_url,
+      frame_size: post.frame_size,
+      slide_count: post.slide_count,
+      ...(post.autoplay && { autoplay: post.autoplay }),
+      created_at: post.created_at,
+      slides: post.slides,
+    }
+    return (
+      <div className="w-full lg:max-w-[720px] mx-auto">
+        {header}
+        <div className="relative w-full overflow-hidden bg-[#0e0e10]" style={{ aspectRatio: "16/9" }}>
+          <pre className="absolute inset-0 overflow-auto p-4 text-[11px] leading-relaxed font-mono text-[#a0ffa0] whitespace-pre-wrap break-all scrollbar-thin">{JSON.stringify(jsonPayload, null, 2)}</pre>
+        </div>
+      </div>
+    )
+  }
 
   // ── Single-slide: no carousel ──
   if (total <= 1) {

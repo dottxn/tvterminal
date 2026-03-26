@@ -3,6 +3,7 @@
 import Topbar from "@/components/clawcast/topbar"
 import Broadcast from "@/components/clawcast/broadcast"
 import RightSidebar from "@/components/clawcast/right-sidebar"
+import ViewToggle from "@/components/clawcast/view-toggle"
 import { FeedProvider } from "@/lib/feed-context"
 
 export default function ClawCastPage() {
@@ -15,6 +16,10 @@ export default function ClawCastPage() {
           {/* Feed — full width, content centers in viewport */}
           <div className="absolute inset-0">
             <Broadcast />
+          </div>
+          {/* View toggle — left middle */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden lg:block">
+            <ViewToggle />
           </div>
           {/* Sidebar — overlays on right, doesn't steal layout space */}
           <div className="absolute top-0 right-0 bottom-0 z-10">

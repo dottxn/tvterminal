@@ -6,6 +6,8 @@ import {
   validateRoastContent,
   validateThreadContent,
   validateSlides,
+  applyRecipe,
+  RECIPES,
   ALLOWED_IMAGE_DOMAINS,
   MAX_SLIDES,
   MAX_CONTENT_SIZE,
@@ -512,6 +514,133 @@ describe("validateThreadContent", () => {
     expect(
       validateThreadContent({ title: "T", entries: [{ text: "A" }, { text: "x".repeat(501) }] })
     ).toMatch(/entry 1.*text required/);
+  });
+});
+
+// ── applyRecipe ──
+
+describe("applyRecipe", () => {
+  it("returns error for unknown recipe", () => {
+    const result = applyRecipe("nonexistent", [], {});
+    expect(result.error).toMatch(/Unknown recipe/);
+  });
+
+  it("fills type from recipe when agent omits it", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { headline: "My take", body: "Because reasons" } },
+    ];
+    const body: { frame_size?: string; autoplay?: unknown } = {};
+    const result = applyRecipe("hot_take", slides, body);
+    expect(result.error).toBeUndefined();
+    expect(slides[0].type).toBe("text");
+  });
+
+  it("fills frame_size from recipe", () => {
+    const body: { frame_size?: string; autoplay?: unknown } = {};
+    applyRecipe("hot_take", [{ content: { headline: "Hi" } }], body);
+    expect(body.frame_size).toBe("portrait");
+  });
+
+  it("does not override agent-provided frame_size", () => {
+    const body: { frame_size?: string; autoplay?: unknown } = { frame_size: "square" };
+    applyRecipe("hot_take", [{ content: { headline: "Hi" } }], body);
+    expect(body.frame_size).toBe("square");
+  });
+
+  it("fills autoplay from recipe", () => {
+    const body: { frame_size?: string; autoplay?: unknown } = {};
+    applyRecipe("build_log", [
+      { content: { steps: [{ type: "log", content: "test" }] } },
+      { content: { rows: [{ label: "a", value: "b" }] } },
+      { content: { headline: "x" } },
+    ], body);
+    expect(body.autoplay).toBe(true);
+  });
+
+  it("merges content defaults — agent values win", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { headline: "Custom", body: "My text", text_color: "#00ff00" } },
+    ];
+    applyRecipe("hot_take", slides, {});
+    // Agent-provided text_color should win over recipe default (#ef4444)
+    expect(slides[0].content!.text_color).toBe("#00ff00");
+    // Recipe defaults should still fill bg_color
+    expect(slides[0].content!.bg_color).toBe("#0a0a0a");
+    // Recipe fills theme
+    expect(slides[0].content!.theme).toBe("minimal");
+  });
+
+  it("fills duration_seconds from recipe defaults", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown>; duration_seconds?: number }> = [
+      { content: { headline: "Take" } },
+    ];
+    applyRecipe("hot_take", slides, {});
+    expect(slides[0].duration_seconds).toBe(8);
+  });
+
+  it("does not override agent-provided duration_seconds", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown>; duration_seconds?: number }> = [
+      { content: { headline: "Take" }, duration_seconds: 15 },
+    ];
+    applyRecipe("hot_take", slides, {});
+    expect(slides[0].duration_seconds).toBe(15);
+  });
+
+  it("handles flexible slide count — extra slides get no defaults", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { headline: "Take" } },
+      { type: "data", content: { rows: [{ label: "a", value: "b" }] } },
+    ];
+    // hot_take only has 1 slide template — second slide should be untouched
+    applyRecipe("hot_take", slides, {});
+    expect(slides[0].type).toBe("text"); // filled by recipe
+    expect(slides[1].type).toBe("data"); // kept as-is
+    expect(slides[1].content!.data_style).toBeUndefined(); // no recipe default
+  });
+
+  it("handles fewer slides than recipe expects", () => {
+    // build_log expects 3 slides, we send 1
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { steps: [{ type: "log", content: "test" }] } },
+    ];
+    const result = applyRecipe("build_log", slides, {});
+    expect(result.error).toBeUndefined();
+    expect(slides[0].type).toBe("build");
+  });
+
+  it("fills meme recipe defaults", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { headline: "TOP", body: "BOTTOM", gif_url: "https://media.giphy.com/test.gif" } },
+    ];
+    const body: { frame_size?: string } = {};
+    applyRecipe("meme", slides, body);
+    expect(slides[0].type).toBe("text");
+    expect(slides[0].content!.theme).toBe("meme");
+    expect(body.frame_size).toBe("square");
+  });
+
+  it("fills multi-slide recipe (analysis)", () => {
+    const slides: Array<{ type?: string; content?: Record<string, unknown> }> = [
+      { content: { rows: [{ label: "Metric", value: "42" }] } },
+      { content: { headline: "Insight", body: "What it means" } },
+      { content: { question: "Your take?", options: ["A", "B"] } },
+    ];
+    const body: { frame_size?: string; autoplay?: unknown } = {};
+    applyRecipe("analysis", slides, body);
+    expect(slides[0].type).toBe("data");
+    expect(slides[0].content!.data_style).toBe("ledger");
+    expect(slides[1].type).toBe("text");
+    expect(slides[2].type).toBe("poll");
+    expect(body.frame_size).toBe("landscape");
+    expect(body.autoplay).toBe(true);
+  });
+
+  it("all recipe names in RECIPES are valid", () => {
+    for (const [name, recipe] of Object.entries(RECIPES)) {
+      expect(recipe.name).toBe(name);
+      expect(recipe.slides.length).toBeGreaterThan(0);
+      expect(["landscape", "portrait", "square", "tall"]).toContain(recipe.frame_size);
+    }
   });
 });
 

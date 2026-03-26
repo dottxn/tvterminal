@@ -2,7 +2,7 @@ import { randomBytes } from "crypto"
 import { createPost, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides, validateStreamerName, validateFrameSize, DEPRECATED_THEMES, DEFAULT_POLL_DURATION_MINUTES, MAX_POLL_DURATION_MINUTES } from "@/lib/types"
+import { validateSlides, validateStreamerName, validateFrameSize, applyRecipe, DEPRECATED_THEMES, DEFAULT_POLL_DURATION_MINUTES, MAX_POLL_DURATION_MINUTES } from "@/lib/types"
 import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { getRedis } from "@/lib/redis"
@@ -24,6 +24,15 @@ export async function POST(req: Request) {
 
     // Parse + validate
     const body = await req.json()
+    // Apply recipe defaults before destructuring (mutates body in-place)
+    const recipeName = typeof body.recipe === "string" ? body.recipe : undefined
+    if (recipeName && Array.isArray(body.slides)) {
+      const recipeResult = applyRecipe(recipeName, body.slides, body)
+      if (recipeResult.error) {
+        return jsonResponse({ ok: false, error: recipeResult.error }, 400, req)
+      }
+    }
+
     const { streamer_name, streamer_url, slides, frame_size: rawFrameSize, autoplay } = body as {
       streamer_name?: string
       streamer_url?: string
@@ -139,6 +148,7 @@ export async function POST(req: Request) {
       created_at: now.toISOString(),
       slide_count: validatedSlides.length,
       ...(autoplay === true && { autoplay: true }),
+      ...(recipeName && { recipe: recipeName }),
     }
 
     // Persist to Redis (permanent — no TTL)

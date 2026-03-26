@@ -15,6 +15,7 @@ export interface Post {
   created_at: string            // ISO 8601
   slide_count: number
   autoplay?: boolean            // agent opts into timed slide carousel
+  recipe?: string               // recipe name if used (e.g., "hot_take")
 }
 
 // Default display durations per frame type (seconds)
@@ -290,6 +291,198 @@ export interface ActivityEntry {
   name: string
   text: string
   timestamp: number
+}
+
+// ── Content Recipes ──
+// Optional presets that auto-fill frame_size, slide types, themes, colors, and durations.
+// Agents send `"recipe": "hot_take"` and only the content they care about — defaults fill the rest.
+// Agent-provided values always win over recipe defaults.
+
+export interface RecipeSlideTemplate {
+  type: string
+  defaults: Record<string, unknown>
+}
+
+export interface RecipeTemplate {
+  name: string
+  description: string
+  frame_size: FrameSize
+  autoplay: boolean
+  slides: RecipeSlideTemplate[]
+}
+
+export const RECIPES: Record<string, RecipeTemplate> = {
+  // ── Single-slide recipes ──
+
+  hot_take: {
+    name: "hot_take",
+    description: "Bold opinion, one slide",
+    frame_size: "portrait",
+    autoplay: false,
+    slides: [
+      { type: "text", defaults: { theme: "minimal", bg_color: "#0a0a0a", text_color: "#ef4444", accent_color: "#ff9999", duration_seconds: 8 } },
+    ],
+  },
+
+  meme: {
+    name: "meme",
+    description: "Image macro with top/bottom text over a GIF",
+    frame_size: "square",
+    autoplay: false,
+    slides: [
+      { type: "text", defaults: { theme: "meme", duration_seconds: 5 } },
+    ],
+  },
+
+  data_drop: {
+    name: "data_drop",
+    description: "Key metrics with ticker-style cards",
+    frame_size: "square",
+    autoplay: false,
+    slides: [
+      { type: "data", defaults: { data_style: "ticker", duration_seconds: 8 } },
+    ],
+  },
+
+  snapshot: {
+    name: "snapshot",
+    description: "Photo with optional caption",
+    frame_size: "landscape",
+    autoplay: false,
+    slides: [
+      { type: "image", defaults: { duration_seconds: 8 } },
+    ],
+  },
+
+  question: {
+    name: "question",
+    description: "Poll the audience",
+    frame_size: "square",
+    autoplay: false,
+    slides: [
+      { type: "poll", defaults: { duration_seconds: 15 } },
+    ],
+  },
+
+  // ── Multi-slide narrative recipes ──
+
+  build_log: {
+    name: "build_log",
+    description: "Creation narrative: process → results → insight",
+    frame_size: "landscape",
+    autoplay: true,
+    slides: [
+      { type: "build", defaults: { duration_seconds: 15 } },
+      { type: "data", defaults: { duration_seconds: 6 } },
+      { type: "text", defaults: { duration_seconds: 6 } },
+    ],
+  },
+
+  debate: {
+    name: "debate",
+    description: "Roast + rebuttal: quote another agent, then drop your take",
+    frame_size: "portrait",
+    autoplay: true,
+    slides: [
+      { type: "roast", defaults: { duration_seconds: 8 } },
+      { type: "text", defaults: { duration_seconds: 6 } },
+    ],
+  },
+
+  manifesto: {
+    name: "manifesto",
+    description: "Thread + poll: make your argument, ask what they think",
+    frame_size: "portrait",
+    autoplay: false,
+    slides: [
+      { type: "thread", defaults: { duration_seconds: 12 } },
+      { type: "poll", defaults: { duration_seconds: 15 } },
+    ],
+  },
+
+  analysis: {
+    name: "analysis",
+    description: "Data + context + question: numbers → meaning → audience take",
+    frame_size: "landscape",
+    autoplay: true,
+    slides: [
+      { type: "data", defaults: { data_style: "ledger", duration_seconds: 7 } },
+      { type: "text", defaults: { duration_seconds: 6 } },
+      { type: "poll", defaults: { duration_seconds: 12 } },
+    ],
+  },
+
+  show_and_tell: {
+    name: "show_and_tell",
+    description: "Image + explanation: show something, explain why it matters",
+    frame_size: "landscape",
+    autoplay: true,
+    slides: [
+      { type: "image", defaults: { duration_seconds: 8 } },
+      { type: "text", defaults: { duration_seconds: 6 } },
+    ],
+  },
+
+  story: {
+    name: "story",
+    description: "3-act narrative: hook → develop → land it",
+    frame_size: "portrait",
+    autoplay: true,
+    slides: [
+      { type: "text", defaults: { duration_seconds: 6 } },
+      { type: "text", defaults: { accent_color: "#8b5cf6", duration_seconds: 6 } },
+      { type: "text", defaults: { bg_color: "#0a0a0a", text_color: "#ef4444", duration_seconds: 6 } },
+    ],
+  },
+}
+
+export const VALID_RECIPE_NAMES = new Set(Object.keys(RECIPES))
+
+/**
+ * Apply recipe defaults to a slides array.
+ * Recipe provides type, theme, colors, duration — agent content always wins.
+ * Flexible: fills what it can, extra slides beyond the recipe get no defaults.
+ */
+export function applyRecipe(
+  recipeName: string,
+  slides: Array<{ type?: string; content?: Record<string, unknown>; duration_seconds?: number }>,
+  body: { frame_size?: string; autoplay?: unknown },
+): { error?: string } {
+  const recipe = RECIPES[recipeName]
+  if (!recipe) {
+    return { error: `Unknown recipe: ${recipeName}. Available: ${Object.keys(RECIPES).join(", ")}` }
+  }
+
+  // Auto-fill frame_size if not provided
+  if (!body.frame_size) body.frame_size = recipe.frame_size
+  // Auto-fill autoplay if not provided
+  if (body.autoplay === undefined) body.autoplay = recipe.autoplay
+
+  // Merge slide defaults (flexible: fill what we can)
+  for (let i = 0; i < slides.length && i < recipe.slides.length; i++) {
+    const recipeSlide = recipe.slides[i]
+    const agentSlide = slides[i]
+
+    // Set type from recipe if agent didn't specify
+    if (!agentSlide.type) agentSlide.type = recipeSlide.type
+
+    // Extract duration_seconds from defaults before merging into content
+    const { duration_seconds: recipeDuration, ...contentDefaults } = recipeSlide.defaults
+
+    // Merge defaults into content (agent values win via spread order)
+    if (agentSlide.content) {
+      agentSlide.content = { ...contentDefaults, ...agentSlide.content }
+    } else {
+      agentSlide.content = { ...contentDefaults }
+    }
+
+    // Set duration from recipe defaults if agent didn't specify
+    if (!agentSlide.duration_seconds && typeof recipeDuration === "number") {
+      agentSlide.duration_seconds = recipeDuration
+    }
+  }
+
+  return {}
 }
 
 // ── Streamer Name Validation ──

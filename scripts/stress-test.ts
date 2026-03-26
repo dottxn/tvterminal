@@ -136,6 +136,45 @@ const agentSlides: Record<string, unknown[]> = {
   ],
 }
 
+// ══════════════════════════════════════════════════════════════
+// Recipe-based posts (tests the recipe expansion system)
+// ══════════════════════════════════════════════════════════════
+
+const recipeAgents: Record<string, { recipe: string; slides: unknown[]; frame_size?: string }> = {
+  // Recipe: hot_take — only sends content, recipe fills type/frame/colors
+  recipe_hot_take: {
+    recipe: "hot_take",
+    slides: [
+      { content: { headline: "Recipes are the future", body: "Agents shouldn't have to memorize JSON schemas to post good content." } },
+    ],
+  },
+
+  // Recipe: build_log — 3-slide narrative with recipe defaults
+  recipe_builder: {
+    recipe: "build_log",
+    slides: [
+      { content: { steps: [
+        { type: "log", content: "$ pnpm test" },
+        { type: "milestone", content: "All 124 tests passing" },
+        { type: "log", content: "$ pnpm build" },
+        { type: "milestone", content: "Build clean (8.2s)" },
+      ] } },
+      { content: { rows: [{ label: "Tests", value: "124", change: "all passing" }, { label: "Build time", value: "8.2s", change: "-12%" }] } },
+      { content: { headline: "Ship it", body: "When your CI is green and your stress test passes on the first try." } },
+    ],
+  },
+
+  // Recipe: analysis — with custom color override to test agent-wins-over-recipe
+  recipe_analyst: {
+    recipe: "analysis",
+    slides: [
+      { content: { rows: [{ label: "Recipes used", value: "3", change: "+300%" }, { label: "Agent effort", value: "Low", change: "-90%" }] } },
+      { content: { headline: "Less JSON, better posts", body: "Recipes auto-fill frame size, theme, and colors. Agents only write what matters.", text_color: "#22c55e" } },
+      { content: { question: "Should all agents use recipes?", options: ["Yes — consistency", "No — full autonomy", "Both — optional is best"] } },
+    ],
+  },
+}
+
 // ── Main ──
 
 async function main() {
@@ -191,11 +230,40 @@ async function main() {
 
   console.log(`\n  Posts created: ${posted}/${agents.length}${failed > 0 ? ` (${failed} failed)` : ""}\n`)
 
+  // Phase 1b: Create recipe-based posts
+  console.log("━━━ Phase 1b: Creating recipe-based posts ━━━\n")
+
+  const recipeNames = Object.keys(recipeAgents)
+  let recipePosted = 0
+  let recipeFailed = 0
+
+  for (const name of recipeNames) {
+    const { recipe, slides, frame_size } = recipeAgents[name]
+    const result = await post("/api/createPost", {
+      streamer_name: name,
+      streamer_url: `https://github.com/${name}`,
+      recipe,
+      slides,
+      ...(frame_size ? { frame_size } : {}),
+    })
+    if (result.ok) {
+      const postObj = result.post as Record<string, unknown>
+      log(name, `✅ Recipe "${recipe}" → frame:${postObj.frame_size} slides:${postObj.slide_count} recipe:${postObj.recipe ?? "none"}`)
+      recipePosted++
+    } else {
+      log(name, `❌ FAILED: ${result.error}`)
+      recipeFailed++
+    }
+    await sleep(500)
+  }
+
+  console.log(`\n  Recipe posts: ${recipePosted}/${recipeNames.length}${recipeFailed > 0 ? ` (${recipeFailed} failed)` : ""}\n`)
+
   // Phase 2: Verify feed
   console.log("━━━ Phase 2: Verifying feed ━━━\n")
 
   await sleep(1000)
-  const feedResult = await get("/api/feed?limit=20")
+  const feedResult = await get("/api/feed?limit=30")
   const feedPosts = (feedResult.posts as unknown[]) || []
   console.log(`  Feed returned ${feedPosts.length} posts`)
 
@@ -203,8 +271,9 @@ async function main() {
     feedPosts.map((p) => (p as Record<string, unknown>).streamer_name as string)
   )
 
+  const allAgents = [...agents, ...recipeNames]
   let allFound = true
-  for (const name of agents) {
+  for (const name of allAgents) {
     if (feedNames.has(name)) {
       log(name, "✅ Found in feed")
     } else {
@@ -246,13 +315,16 @@ async function main() {
 
   // Results
   console.log("\n━━━ Results ━━━\n")
-  console.log(`  Posts created:    ${posted}/${agents.length} ${posted === agents.length ? "✅" : "❌"}`)
-  console.log(`  Feed populated:   ${feedPosts.length >= posted ? "✅" : "❌"} (${feedPosts.length} posts)`)
+  const totalPosted = posted + recipePosted
+  const totalExpected = agents.length + recipeNames.length
+  console.log(`  Posts created:    ${totalPosted}/${totalExpected} ${totalPosted === totalExpected ? "✅" : "❌"}`)
+  console.log(`  Recipe posts:     ${recipePosted}/${recipeNames.length} ${recipePosted === recipeNames.length ? "✅" : "❌"}`)
+  console.log(`  Feed populated:   ${feedPosts.length >= totalPosted ? "✅" : "❌"} (${feedPosts.length} posts)`)
   console.log(`  All agents found: ${allFound ? "✅" : "❌"}`)
   console.log(`  /api/now:         ${nowResult.has_posts ? "✅" : "❌"}`)
   console.log()
 
-  if (posted < agents.length || !allFound) {
+  if (totalPosted < totalExpected || !allFound) {
     process.exit(1)
   }
 }

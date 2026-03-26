@@ -7,11 +7,12 @@ import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction, HistoryC
 import { ALLOWED_REACTION_EMOJI, FRAME_SIZES, type FrameSize } from "@/lib/types"
 
 // Desktop width classes per frame size (narrower cards centered, Porto Rocha style)
+// Mobile: full-width. Desktop (lg+): variable max-widths.
 const FRAME_SIZE_WIDTH: Record<FrameSize, string> = {
-  landscape: "max-w-[640px]",
-  square: "max-w-[480px]",
-  portrait: "max-w-[420px]",
-  tall: "max-w-[360px]",
+  landscape: "w-full lg:max-w-[640px]",
+  square: "w-full lg:max-w-[480px]",
+  portrait: "w-full lg:max-w-[420px]",
+  tall: "w-full lg:max-w-[360px]",
 }
 
 // ── Hex color validation ──
@@ -951,8 +952,8 @@ function OnboardingCard() {
   }
 
   return (
-    <div className="w-full max-w-[640px] mx-auto">
-      <div className="flex flex-col gap-8 py-12 px-8">
+    <div className="w-full lg:max-w-[640px] mx-auto">
+      <div className="flex flex-col gap-8 py-8 lg:py-12 px-4 lg:px-8">
 
         {/* Send to agent */}
         <div>
@@ -1374,16 +1375,43 @@ function formatTimeAgo(timestamp: number): string {
 // ── Back to Live Pill ──
 
 function BackToLivePill({ onClick, visible }: { onClick: () => void; visible: boolean }) {
+  if (!visible) return null
   return (
     <button
       onClick={onClick}
-      className={`fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#e91916] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] shadow-lg transition-all duration-200 ${
-        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
-      }`}
+      className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#e91916] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] shadow-lg pill-enter"
       aria-label="Back to live"
     >
       <span className="w-2 h-2 rounded-full bg-white live-pulse" />
       Live
+    </button>
+  )
+}
+
+// ── Now Playing Mini-bar ──
+// Thin bar at top of feed when user has scrolled away from live content
+
+function NowPlayingBar({ streamerName, liveInfo, onClick, visible }: {
+  streamerName: string
+  liveInfo: { seconds_remaining: number } | null
+  onClick: () => void
+  visible: boolean
+}) {
+  if (!visible) return null
+  return (
+    <button
+      onClick={onClick}
+      className="sticky top-0 z-20 w-full flex items-center gap-3 px-4 py-2 bg-[#18181b]/95 backdrop-blur-sm border-b border-[#2a2a35] cursor-pointer hover:bg-[#1f1f23] transition-colors"
+      aria-label="Scroll to live content"
+    >
+      <span className="w-2 h-2 rounded-full bg-[#e91916] live-pulse shrink-0" />
+      <span className="text-[12px] font-mono text-[#efeff1]">{streamerName}</span>
+      {liveInfo && (
+        <span className="text-[11px] font-mono text-[#53535f] tabular-nums">
+          {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")}
+        </span>
+      )}
+      <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.1em] text-[#7a7a8a]">↑ now playing</span>
     </button>
   )
 }
@@ -1473,30 +1501,42 @@ export default function Broadcast() {
     setShowLivePill(false)
   }
 
+  const showNowPlaying = showLivePill && !!streamerName
+
   return (
-    <div ref={feedRef} className="relative flex flex-col flex-1 min-w-0 overflow-y-auto">
+    <div ref={feedRef} className="relative flex flex-col flex-1 min-w-0 overflow-y-auto scroll-smooth">
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
-      <div className="flex flex-col items-center w-full py-6 px-4 gap-6 min-h-full">
+      {/* Now Playing mini-bar — sticky at top when scrolled away from live */}
+      <NowPlayingBar
+        streamerName={streamerName || ""}
+        liveInfo={liveInfo}
+        onClick={scrollToLive}
+        visible={showNowPlaying}
+      />
+
+      <div className="flex flex-col items-center w-full py-6 px-4 gap-8 min-h-full">
 
         {/* Live card or bumper */}
-        <FeedCard
-          activeFrame={activeFrame}
-          frameKey={frameKey}
-          duetContext={duetContext}
-          pollContext={pollContext}
-          isLive={isLive}
-          streamerName={streamerName}
-          slideType={slideType}
-          viewerCount={viewerCount}
-          liveInfo={liveInfo}
-          isBatchPlaying={isBatchPlaying}
-          batchSlides={batchSlides}
-          batchIndex={batchIndex}
-          reactions={reactions}
-          react={react}
-          frameSize={currentFrameSize}
-        />
+        <div className="card-enter w-full flex justify-center">
+          <FeedCard
+            activeFrame={activeFrame}
+            frameKey={frameKey}
+            duetContext={duetContext}
+            pollContext={pollContext}
+            isLive={isLive}
+            streamerName={streamerName}
+            slideType={slideType}
+            viewerCount={viewerCount}
+            liveInfo={liveInfo}
+            isBatchPlaying={isBatchPlaying}
+            batchSlides={batchSlides}
+            batchIndex={batchIndex}
+            reactions={reactions}
+            react={react}
+            frameSize={currentFrameSize}
+          />
+        </div>
 
         {/* History cards */}
         {feedHistory.map((card) => (

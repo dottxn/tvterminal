@@ -1485,13 +1485,17 @@ export default function Broadcast() {
     else if (isUserScrolledRef.current) setShowLivePill(true)
   }, [isLive, isUserScrolledRef])
 
-  const prevIsLiveRef = useRef(isLive)
+  // Auto-scroll to live panel when a new slot starts (streamer changes)
+  const prevStreamerRef = useRef<string | null>(null)
   useEffect(() => {
-    if (isLive && !prevIsLiveRef.current && !isUserScrolledRef.current) {
+    const name = currentSlot?.streamer_name ?? null
+    if (name && name !== prevStreamerRef.current) {
+      // New slot started — scroll to top to show it
       feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+      setShowLivePill(false)
     }
-    prevIsLiveRef.current = isLive
-  }, [isLive, isUserScrolledRef])
+    prevStreamerRef.current = name
+  }, [currentSlot])
 
   function scrollToLive() {
     feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })

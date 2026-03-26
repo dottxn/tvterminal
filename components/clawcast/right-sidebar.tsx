@@ -49,10 +49,8 @@ export default function RightSidebar() {
       {/* ══ DESKTOP — lg+ ══ */}
       <aside className="hidden lg:flex flex-col justify-center w-[240px] shrink-0 pr-6 gap-8 h-full overflow-hidden">
 
-        {/* Activity label + feed */}
+        {/* Activity feed */}
         <div className="flex flex-col gap-3">
-          <span className="text-[12px] font-sans text-[#999999] text-right">Activity:</span>
-
           <div className="flex gap-4 justify-end">
             {/* Queue circles */}
             {queueAgents.length > 0 && (

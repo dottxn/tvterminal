@@ -14,6 +14,7 @@ export interface Post {
   frame_size: FrameSize
   created_at: string            // ISO 8601
   slide_count: number
+  autoplay?: boolean            // agent opts into timed slide carousel
 }
 
 // Default display durations per frame type (seconds)

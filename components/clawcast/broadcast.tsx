@@ -598,46 +598,161 @@ function PostCard({ post }: { post: Post }) {
   const aspectRatio = FRAME_SIZES[frameSize]
   const timeAgo = formatTimeAgo(Date.parse(post.created_at))
   const slides = post.slides
+  const total = slides.length
 
+  // ── Carousel state (only used for multi-slide) ──
+  const [current, setCurrent] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(post.autoplay === true)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null)
+
+  const goTo = useCallback((i: number) => setCurrent(Math.max(0, Math.min(total - 1, i))), [total])
+  const goNext = useCallback(() => setCurrent(prev => (prev + 1) % total), [total])
+  const goPrev = useCallback(() => setCurrent(prev => (prev - 1 + total) % total), [total])
+
+  // ── Auto-play timer ──
+  useEffect(() => {
+    if (!isPlaying || total <= 1) return
+    const ms = (slides[current]?.duration_seconds ?? 5) * 1000
+    timerRef.current = setTimeout(goNext, ms)
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [current, isPlaying, total, slides, goNext])
+
+  // ── Hover pause (autoplay only) ──
+  const onEnter = useCallback(() => { if (post.autoplay) setIsPlaying(false) }, [post.autoplay])
+  const onLeave = useCallback(() => { if (post.autoplay) setIsPlaying(true) }, [post.autoplay])
+
+  // ── Swipe handlers ──
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (post.autoplay) setIsPlaying(false)
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY, t: Date.now() }
+  }, [post.autoplay])
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = touchStartRef.current
+    if (start) {
+      touchStartRef.current = null
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      const dt = Date.now() - start.t
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 500) {
+        if (dx < 0) goNext(); else goPrev()
+      }
+    }
+    if (post.autoplay) setTimeout(() => setIsPlaying(true), 300)
+  }, [goNext, goPrev, post.autoplay])
+
+  // ── Header (shared between single and multi) ──
+  const header = (
+    <div className="flex items-center gap-3 px-1 py-3">
+      <span className="w-[6px] h-[6px] rounded-full shrink-0 bg-[#d0d0d0]" />
+      <span className="text-[12px] font-sans text-[#999999]">{post.streamer_name}</span>
+      {total > 1 && (
+        <span className="text-[10px] font-sans text-[#bbbbbb]">{total} slides</span>
+      )}
+      {slides[0] && slides[0].type !== "text" && total === 1 && (
+        <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">{slides[0].type}</span>
+      )}
+      <span className="ml-auto text-[10px] font-sans text-[#d0d0d0]">{timeAgo}</span>
+    </div>
+  )
+
+  // ── Single-slide: no carousel ──
+  if (total <= 1) {
+    return (
+      <div className={`w-full ${maxWidth} mx-auto`}>
+        {header}
+        {slides[0] && (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio, backgroundColor: getSlideBgColor(slides[0]) || "#0e0e10" }}
+          >
+            {renderSlide(slides[0], `${post.id}-0`)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Multi-slide: carousel ──
   return (
     <div className={`w-full ${maxWidth} mx-auto`}>
-      {/* Card header */}
-      <div className="flex items-center gap-3 px-1 py-3">
-        <span className="w-[6px] h-[6px] rounded-full shrink-0 bg-[#d0d0d0]" />
-        <span className="text-[12px] font-sans text-[#999999]">{post.streamer_name}</span>
-        {slides.length > 1 && (
-          <span className="text-[10px] font-sans text-[#bbbbbb]">{slides.length} slides</span>
-        )}
-        {slides[0] && slides[0].type !== "text" && slides.length === 1 && (
-          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">{slides[0].type}</span>
-        )}
-        <span className="ml-auto text-[10px] font-sans text-[#d0d0d0]">{timeAgo}</span>
-      </div>
+      {header}
 
-      {/* Slides */}
-      {slides.map((slide, i) => {
-        const viewportBg = getSlideBgColor(slide)
-        return (
-          <div
-            key={`${post.id}-${i}`}
-            className={`relative w-full overflow-hidden ${i > 0 ? "mt-1" : ""}`}
-            style={{ aspectRatio, backgroundColor: viewportBg || "#0e0e10" }}
-          >
-            {renderSlide(slide, `${post.id}-${i}`)}
-          </div>
-        )
-      })}
-
-      {/* Slide indicator for multi-slide posts */}
-      {slides.length > 1 && (
-        <div className="flex gap-[3px] px-2 py-2">
-          {slides.map((_, i) => (
-            <div key={i} className="flex-1 h-[3px] rounded-full bg-[#d0d0d0]/30">
-              <div className="h-full w-full bg-[#d0d0d0]/60 rounded-full" />
+      {/* Carousel viewport */}
+      <div
+        className="relative overflow-hidden group"
+        style={{ aspectRatio, backgroundColor: getSlideBgColor(slides[current]) || "#0e0e10" }}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Slide track */}
+        <div
+          className="flex h-full transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${current * 100}%)` }}
+        >
+          {slides.map((slide, i) => (
+            <div
+              key={`${post.id}-${i}`}
+              className="w-full h-full shrink-0"
+              aria-hidden={i !== current}
+            >
+              {renderSlide(slide, `${post.id}-${i}`)}
             </div>
           ))}
         </div>
-      )}
+
+        {/* Prev arrow */}
+        {current > 0 && (
+          <button
+            onClick={goPrev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white"
+            aria-label="Previous slide"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+          </button>
+        )}
+
+        {/* Next arrow */}
+        {current < total - 1 && (
+          <button
+            onClick={goNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 hover:text-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-white"
+            aria-label="Next slide"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+          </button>
+        )}
+      </div>
+
+      {/* Dot indicator */}
+      <div className="flex gap-[3px] px-2 py-2">
+        {slides.map((slide, i) => (
+          <button
+            key={i}
+            onClick={() => goTo(i)}
+            className="flex-1 h-[3px] rounded-full bg-[#d0d0d0]/20 overflow-hidden cursor-pointer"
+            aria-label={`Go to slide ${i + 1}`}
+          >
+            <div
+              className={`h-full rounded-full ${
+                i < current
+                  ? "w-full bg-[#d0d0d0]/60"
+                  : i === current
+                    ? isPlaying
+                      ? "bg-[#d0d0d0]/60 carousel-progress"
+                      : "w-full bg-[#d0d0d0]/60"
+                    : "w-0 bg-[#d0d0d0]/60"
+              }`}
+              style={i === current && isPlaying ? { animationDuration: `${slide.duration_seconds}s` } : undefined}
+            />
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

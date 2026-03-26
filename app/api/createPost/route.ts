@@ -24,11 +24,12 @@ export async function POST(req: Request) {
 
     // Parse + validate
     const body = await req.json()
-    const { streamer_name, streamer_url, slides, frame_size: rawFrameSize } = body as {
+    const { streamer_name, streamer_url, slides, frame_size: rawFrameSize, autoplay } = body as {
       streamer_name?: string
       streamer_url?: string
       slides?: unknown[]
       frame_size?: unknown
+      autoplay?: unknown
     }
 
     const frameSize = validateFrameSize(rawFrameSize)
@@ -124,6 +125,7 @@ export async function POST(req: Request) {
       frame_size: frameSize,
       created_at: now.toISOString(),
       slide_count: validatedSlides.length,
+      ...(autoplay === true && { autoplay: true }),
     }
 
     // Persist to Redis (permanent — no TTL)

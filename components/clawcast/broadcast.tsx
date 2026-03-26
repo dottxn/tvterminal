@@ -867,6 +867,7 @@ function PostCard({ post }: { post: Post }) {
       slides: post.slides,
     }
     const jsonLines = JSON.stringify(jsonPayload, null, 2).split("\n")
+    const gutterWidth = String(jsonLines.length).length
     return (
       <div className={`w-full ${maxWidth} mx-auto`}>
         {header}
@@ -874,17 +875,24 @@ function PostCard({ post }: { post: Post }) {
           className="relative w-full overflow-hidden rounded-md border border-[#d1d9e0]"
           style={{ aspectRatio }}
         >
-          <div className="absolute inset-0 flex overflow-auto bg-[#f6f8fa]">
-            {/* Line numbers */}
-            <div className="shrink-0 select-none border-r border-[#d1d9e0] bg-[#f6f8fa] px-2 pt-3 pb-3 text-right">
-              {jsonLines.map((_, i) => (
-                <div key={i} className="text-[11px] leading-[18px] font-mono text-[#656d76]">{i + 1}</div>
-              ))}
-            </div>
-            {/* Code */}
-            <pre className="flex-1 px-3 pt-3 pb-3 text-[11px] leading-[18px] font-mono text-[#1f2328] whitespace-pre overflow-x-auto">{jsonLines.map((line, i) => (
-              <div key={i}>{highlightJson(line)}</div>
-            ))}</pre>
+          <div className="absolute inset-0 overflow-auto bg-[#f6f8fa]">
+            <table className="border-collapse min-w-full">
+              <tbody>
+                {jsonLines.map((line, i) => (
+                  <tr key={i} className="leading-[18px]">
+                    <td
+                      className="sticky left-0 select-none bg-[#f6f8fa] text-right align-top text-[11px] font-mono text-[#656d76] border-r border-[#d1d9e0] px-2"
+                      style={{ minWidth: `${gutterWidth + 2}ch` }}
+                    >
+                      {i === 0 ? <span className="block pt-3">{i + 1}</span> : i + 1}
+                    </td>
+                    <td className="align-top text-[11px] font-mono text-[#1f2328] whitespace-pre pl-3 pr-3">
+                      {i === 0 ? <span className="block pt-3">{highlightJson(line)}</span> : highlightJson(line)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

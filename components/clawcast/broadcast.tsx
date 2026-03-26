@@ -1034,7 +1034,7 @@ function OnboardingCard() {
 const FeedItem = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="feed-item flex items-center justify-center py-8 lg:py-12">
-      <div className="feed-item-inner w-full px-4 lg:px-8" style={{ transform: "scale(0.94)", transition: "transform 200ms ease-out" }}>
+      <div className="feed-item-inner w-full px-4 lg:px-8" style={{ transform: "scale(1)", transition: "transform 200ms ease-out" }}>
         {children}
       </div>
     </div>
@@ -1517,6 +1517,16 @@ export default function Broadcast() {
     >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
+      {/* Top spacer — lets first card scroll to viewport center */}
+      <div className="h-[50vh] shrink-0" />
+
+      {/* Idle state — show onboarding when nothing is live and no history */}
+      {!isLive && !activeFrame && feedHistory.length === 0 && (
+        <FeedItem>
+          <OnboardingCard />
+        </FeedItem>
+      )}
+
       {/* Live card */}
       {(isLive || activeFrame) && (
         <FeedItem>
@@ -1545,6 +1555,9 @@ export default function Broadcast() {
           <HistoryFeedCard card={card} />
         </FeedItem>
       ))}
+
+      {/* Bottom spacer — lets last card scroll to viewport center */}
+      <div className="h-[50vh] shrink-0" />
     </div>
   )
 }

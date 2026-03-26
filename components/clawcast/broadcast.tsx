@@ -1027,34 +1027,34 @@ function OnboardingCard() {
   )
 }
 
-// ── Feed Panel ──
-// Wraps each card in the feed. Continuous scale effect — cards grow as they
-// enter the viewport center, shrink as they leave.
+// ── Snap Panel ──
+// Full-viewport panel with scale-on-scroll focus effect.
+// In-view panel is scale(1), scrolled-away shrinks to scale(0.92).
 
-function FeedPanel({ children }: { children: React.ReactNode }) {
+function SnapPanel({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(0.92)
+  const [inView, setInView] = useState(true)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const thresholds = Array.from({ length: 21 }, (_, i) => i / 20)
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        const t = Math.min(entry.intersectionRatio / 0.5, 1)
-        setScale(0.92 + t * 0.08)
-      },
-      { threshold: thresholds }
+      ([entry]) => setInView(entry.intersectionRatio > 0.5),
+      { threshold: [0, 0.5, 1] }
     )
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
   return (
-    <div ref={ref} className="flex items-center justify-center py-6 lg:py-10">
+    <div
+      ref={ref}
+      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0"
+      style={{ scrollSnapAlign: "start" }}
+    >
       <div
-        className="transition-transform duration-150 ease-out w-full px-4 lg:px-8"
-        style={{ transform: `scale(${scale})` }}
+        className="transition-transform duration-300 ease-out w-full px-4 lg:px-8"
+        style={{ transform: inView ? "scale(1)" : "scale(0.92)" }}
       >
         {children}
       </div>
@@ -1461,14 +1461,20 @@ export default function Broadcast() {
 
   const currentFrameSize: FrameSize = (currentSlot?.frame_size as FrameSize) || "landscape"
 
-  // Scroll tracking
+  // Track which panel index the user is viewing
+  const [currentPanel, setCurrentPanel] = useState(0)
+  const panelHeight = typeof window !== "undefined" ? window.innerHeight - 48 : 800
+
+  // Scroll tracking — detect which panel is in view
   useEffect(() => {
     const feedEl = feedRef.current
     if (!feedEl) return
 
     function handleScroll() {
       const scrollTop = feedEl!.scrollTop
-      const scrolled = scrollTop > 200
+      const panel = Math.round(scrollTop / panelHeight)
+      setCurrentPanel(panel)
+      const scrolled = panel > 0
       isUserScrolledRef.current = scrolled
       setIsUserScrolled(scrolled)
       setShowLivePill(scrolled && isLive)
@@ -1476,24 +1482,37 @@ export default function Broadcast() {
 
     feedEl.addEventListener("scroll", handleScroll, { passive: true })
     return () => feedEl.removeEventListener("scroll", handleScroll)
-  }, [isLive, isUserScrolledRef, setIsUserScrolled])
+  }, [isLive, isUserScrolledRef, setIsUserScrolled, panelHeight])
 
   useEffect(() => {
     if (!isLive) setShowLivePill(false)
     else if (isUserScrolledRef.current) setShowLivePill(true)
   }, [isLive, isUserScrolledRef])
 
-  // Gentle auto-scroll on new slot — only if user is near the top
+  // Auto-advance: when a slot ends (isLive goes false while history grows),
+  // scroll down one panel to show the completed card moving away
+  const prevHistoryLenRef = useRef(feedHistory.length)
+  useEffect(() => {
+    if (feedHistory.length > prevHistoryLenRef.current) {
+      // A new history card was added — a slot just ended
+      // If user is on panel 0 (watching live), stay on panel 0
+      // The new history card pushes below, and the next live content
+      // will appear in panel 0 when the next slot starts
+    }
+    prevHistoryLenRef.current = feedHistory.length
+  }, [feedHistory.length])
+
+  // When a new slot starts, scroll to panel 0 if user is on panel 0 or 1
   const prevStreamerRef = useRef<string | null>(null)
   useEffect(() => {
     const name = currentSlot?.streamer_name ?? null
     if (name && name !== prevStreamerRef.current) {
-      if (feedRef.current && feedRef.current.scrollTop < 300) {
-        feedRef.current.scrollTo({ top: 0, behavior: "smooth" })
+      if (currentPanel <= 1) {
+        feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })
       }
     }
     prevStreamerRef.current = name
-  }, [currentSlot])
+  }, [currentSlot, currentPanel])
 
   function scrollToLive() {
     feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })
@@ -1503,37 +1522,36 @@ export default function Broadcast() {
   return (
     <div
       ref={feedRef}
-      className="relative flex flex-col w-full h-full overflow-y-auto"
+      className="relative flex flex-col w-full h-full overflow-y-scroll"
+      style={{ scrollSnapType: "y mandatory" }}
     >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
-      {/* Live card */}
-      {(isLive || activeFrame) && (
-        <FeedPanel>
-          <FeedCard
-            activeFrame={activeFrame}
-            frameKey={frameKey}
-            duetContext={duetContext}
-            pollContext={pollContext}
-            isLive={isLive}
-            streamerName={streamerName}
-            slideType={slideType}
-            liveInfo={liveInfo}
-            isBatchPlaying={isBatchPlaying}
-            batchSlides={batchSlides}
-            batchIndex={batchIndex}
-            reactions={reactions}
-            react={react}
-            frameSize={currentFrameSize}
-          />
-        </FeedPanel>
-      )}
+      {/* Live card — panel 0 */}
+      <SnapPanel>
+        <FeedCard
+          activeFrame={activeFrame}
+          frameKey={frameKey}
+          duetContext={duetContext}
+          pollContext={pollContext}
+          isLive={isLive}
+          streamerName={streamerName}
+          slideType={slideType}
+          liveInfo={liveInfo}
+          isBatchPlaying={isBatchPlaying}
+          batchSlides={batchSlides}
+          batchIndex={batchIndex}
+          reactions={reactions}
+          react={react}
+          frameSize={currentFrameSize}
+        />
+      </SnapPanel>
 
-      {/* History cards */}
+      {/* History cards — one per snap panel */}
       {feedHistory.map((card) => (
-        <FeedPanel key={card.slotId}>
+        <SnapPanel key={card.slotId}>
           <HistoryFeedCard card={card} />
-        </FeedPanel>
+        </SnapPanel>
       ))}
     </div>
   )

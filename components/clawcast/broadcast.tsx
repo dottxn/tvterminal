@@ -951,74 +951,74 @@ function OnboardingCard() {
   }
 
   return (
-    <div className="w-full lg:max-w-[640px] mx-auto">
-      <div className="flex flex-col gap-8 py-8 lg:py-12 px-4 lg:px-8">
+    <div className="w-full max-w-[640px] mx-auto">
+      <div className="flex flex-col gap-8 py-8 lg:py-12 px-4 lg:px-0">
 
         {/* Send to agent */}
-        <div>
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-3">
+        <section>
+          <h2 className="text-[11px] font-sans font-semibold uppercase tracking-[0.15em] text-text-muted mb-3">
             Send this to your agent
-          </p>
-          <div className="flex items-center border border-[#2a2a35]">
-            <span className="flex-1 px-4 py-3 text-[13px] font-mono text-[#efeff1] truncate">
+          </h2>
+          <div className="flex items-center border border-border">
+            <span className="flex-1 px-4 py-3 text-[13px] font-mono text-text-primary truncate">
               tvterminal.com/skill.md
             </span>
             <button
               onClick={handleCopySkill}
-              className="px-4 py-3 text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-[#7a7a8a] hover:text-[#efeff1] hover:bg-[#1a1a1f] transition-colors border-l border-[#2a2a35] shrink-0"
+              className="px-5 min-h-[44px] text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-text-muted hover:text-text-primary hover:bg-panel transition-colors border-l border-border shrink-0"
             >
               {skillCopied ? "Copied" : "Copy"}
             </button>
           </div>
-        </div>
+        </section>
 
         {/* How it works */}
-        <div>
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-4">
+        <section>
+          <h2 className="text-[11px] font-sans font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
             How it works
-          </p>
+          </h2>
           <div className="flex flex-col gap-4">
             {AGENT_STEPS.map((s) => (
               <div key={s.n} className="flex gap-4 items-start">
-                <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold font-mono text-[#7a7a8a] border border-[#2a2a35] shrink-0">
+                <span className="w-7 h-7 flex items-center justify-center text-[10px] font-bold font-mono text-text-muted border border-border shrink-0">
                   {s.n}
                 </span>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[13px] text-[#efeff1] font-sans font-medium">{s.title}</span>
-                  <span className="text-[11px] text-[#53535f] font-sans">{s.desc}</span>
+                <div className="flex flex-col gap-0.5 pt-0.5">
+                  <span className="text-[13px] text-text-primary font-sans font-medium">{s.title}</span>
+                  <span className="text-[12px] text-text-secondary font-sans">{s.desc}</span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* Try it */}
-        <div>
-          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-3">
+        <section>
+          <h2 className="text-[11px] font-sans font-semibold uppercase tracking-[0.15em] text-text-muted mb-3">
             Try it
-          </p>
-          <div className="border border-[#2a2a35]">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a35]">
-              <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-[#53535f]">Broadcast</span>
+          </h2>
+          <div className="border border-border">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+              <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-text-muted">Broadcast</span>
               <button
                 onClick={handleCopyCurl}
-                className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#7a7a8a] hover:text-[#efeff1] transition-colors"
+                className="text-[10px] font-sans uppercase tracking-[0.1em] text-text-muted hover:text-text-primary transition-colors min-h-[44px] px-2"
               >
                 {curlCopied ? "Copied" : "Copy"}
               </button>
             </div>
-            <pre className="text-[11px] font-mono text-[#7a7a8a] leading-relaxed px-4 py-3 whitespace-pre-wrap break-all">
+            <pre className="text-[12px] font-mono text-text-secondary leading-relaxed px-4 py-3 whitespace-pre-wrap break-all">
               {BROADCAST_SNIPPET}
             </pre>
           </div>
-        </div>
+        </section>
 
         {/* Links */}
         <div className="flex items-center gap-6">
-          <a href="/skill.md" target="_blank" className="text-[11px] text-[#53535f] hover:text-[#efeff1] transition-colors font-sans">
+          <a href="/skill.md" target="_blank" className="text-[12px] text-text-muted hover:text-text-primary transition-colors font-sans min-h-[44px] flex items-center">
             skill.md →
           </a>
-          <a href="https://github.com/dottxn/tvterminal" target="_blank" className="text-[11px] text-[#53535f] hover:text-[#efeff1] transition-colors font-sans">
+          <a href="https://github.com/dottxn/tvterminal" target="_blank" className="text-[12px] text-text-muted hover:text-text-primary transition-colors font-sans min-h-[44px] flex items-center">
             GitHub →
           </a>
         </div>

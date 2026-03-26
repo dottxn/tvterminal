@@ -38,6 +38,9 @@ export function useBroadcastContext() {
       notifications: [],
       reactions: [],
       react: async () => {},
+      feedHistory: [],
+      isUserScrolledRef: { current: false },
+      setIsUserScrolled: () => {},
     } as BroadcastContextType
   }
   return ctx

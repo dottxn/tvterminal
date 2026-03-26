@@ -105,6 +105,14 @@ export interface Notification {
   exiting?: boolean
 }
 
+export interface HistoryCard {
+  slotId: string
+  streamerName: string
+  slides: BatchSlide[]
+  completedAt: number
+  isLive: boolean
+}
+
 // Generate a consistent color from a string
 function nameToColor(name: string): string {
   const colors = ["#E63946", "#00c853", "#ff7b00", "#00b8d9", "#9b59b6", "#e67e22", "#1abc9c"]
@@ -142,6 +150,18 @@ export function useBroadcast() {
 
   // Floating reaction emoji (max 8, auto-dismiss after 3s)
   const [reactions, setReactions] = useState<FloatingReaction[]>([])
+
+  // Feed history — completed broadcast cards (max 20)
+  const [feedHistory, setFeedHistory] = useState<HistoryCard[]>([])
+
+  // Track current batch slides for history capture (ref to avoid stale closures)
+  const currentBatchSlidesRef = useRef<BatchSlide[]>([])
+  useEffect(() => { currentBatchSlidesRef.current = batchSlides }, [batchSlides])
+  const currentSlotRef = useRef<SlotInfo | null>(null)
+  useEffect(() => { currentSlotRef.current = currentSlot }, [currentSlot])
+
+  // Whether the user has scrolled away from the live card
+  const isUserScrolledRef = useRef(false)
 
   const slotEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -454,17 +474,32 @@ export function useBroadcast() {
       setCurrentSlot(data)
       clearBatch()
       pushActivity(data.streamer_name, "went live")
+
+      // Auto-scroll to live only if user is near top
+      // (scrollFeedToTop is called from the component via callback)
     })
 
-    // Slot end — delay ALL cleanup so the next slot_start can cancel it.
-    // Don't call clearBatch() immediately — the batch auto-advance already
-    // handles reaching the last slide. Clearing batch here mid-play causes a
-    // visual glitch (the current slide vanishes then reappears as latestFrame).
+    // Slot end — capture to history + delay cleanup so next slot_start can cancel it.
     liveChannel.subscribe("slot_end", (msg) => {
       const data = msg.data as { streamer_name?: string }
       if (data.streamer_name) {
         pushActivity(data.streamer_name, "finished broadcasting")
       }
+
+      // Capture this broadcast to feed history before clearing
+      const completedSlot = currentSlotRef.current
+      const completedSlides = currentBatchSlidesRef.current
+      if (completedSlot && completedSlides.length > 0) {
+        const historyCard: HistoryCard = {
+          slotId: `${completedSlot.streamer_name}-${Date.now()}`,
+          streamerName: completedSlot.streamer_name,
+          slides: [...completedSlides],
+          completedAt: Date.now(),
+          isLive: false,
+        }
+        setFeedHistory(prev => [historyCard, ...prev].slice(0, 20))
+      }
+
       setActivePoll(null)
       // Delay clearing ALL visual state to allow the next slot_start to arrive
       const endTimer = setTimeout(() => {
@@ -543,6 +578,11 @@ export function useBroadcast() {
     }
   }, [client, clearBatch, pushActivity, pushNotification])
 
+  // Setter for isUserScrolled (called by the feed component)
+  const setIsUserScrolled = useCallback((val: boolean) => {
+    isUserScrolledRef.current = val
+  }, [])
+
   return {
     connected,
     isLive,
@@ -565,5 +605,9 @@ export function useBroadcast() {
     // Reactions
     reactions,
     react,
+    // Feed history
+    feedHistory,
+    isUserScrolledRef,
+    setIsUserScrolled,
   }
 }

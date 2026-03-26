@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import DOMPurify from "isomorphic-dompurify"
-import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction, HistoryCard } from "@/hooks/use-broadcast"
 import { ALLOWED_REACTION_EMOJI } from "@/lib/types"
 
 // ── Hex color validation ──
@@ -1136,6 +1136,239 @@ function FeedCard({
   )
 }
 
+// ── Frozen renderers for history cards ──
+// These show completed state — no interactivity, all content revealed
+
+function FrozenBuildLayout({ content }: { content: BroadcastFrame["content"] }) {
+  const steps = (content.steps || []) as Array<{ type: string; content: string }>
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
+      <div className="w-full max-w-[560px] px-6 py-8 flex flex-col gap-2 max-h-full overflow-y-auto">
+        {steps.map((step, i) => {
+          if (step.type === "milestone") {
+            return (
+              <div key={i} className="flex items-center gap-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-[#00e5b0] shrink-0" />
+                <span className="text-[16px] font-sans font-semibold text-[#00e5b0]">{step.content}</span>
+              </div>
+            )
+          }
+          if (step.type === "preview") {
+            const isImageUrl = /^https:\/\//.test(step.content)
+            if (isImageUrl) {
+              return (
+                <div key={i} className="py-2">
+                  <img src={step.content} alt="Preview" className="max-w-full max-h-[200px] object-contain rounded" referrerPolicy="no-referrer" crossOrigin="anonymous" loading="lazy" />
+                </div>
+              )
+            }
+            return (
+              <div key={i} className="py-2 px-3 bg-[#1a1a1f] border border-[#2a2a35] rounded">
+                <span className="text-[13px] font-mono text-[#adadb8] whitespace-pre-wrap">{step.content}</span>
+              </div>
+            )
+          }
+          return (
+            <div key={i} className="flex items-start gap-2 py-0.5">
+              <span className="text-[11px] font-mono text-[#53535f] shrink-0 mt-0.5">{">"}</span>
+              <span className="text-[13px] font-mono text-[#adadb8]">{step.content}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function FrozenThreadLayout({ content }: { content: BroadcastFrame["content"] }) {
+  const title = content.title || ""
+  const entries = (content.entries || []) as Array<{ text: string }>
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
+      <div className="w-full max-w-[560px] px-6 py-8 flex flex-col gap-4 max-h-full overflow-y-auto">
+        {title && (
+          <h2 className="text-[clamp(20px,3vw,28px)] font-display-grotesk font-semibold text-[#efeff1] leading-tight mb-2">
+            {sanitize(title)}
+          </h2>
+        )}
+        {entries.map((entry, i) => (
+          <div key={i} className="flex items-start gap-3 py-1">
+            <span className="text-[14px] font-mono font-semibold text-[#00e5b0] shrink-0 mt-0.5 tabular-nums w-5 text-right">{i + 1}</span>
+            <p className="text-[15px] font-sans text-[#adadb8] leading-relaxed">{sanitize(entry.text)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FrozenPollLayout({ content }: { content: BroadcastFrame["content"] }) {
+  const question = content.question || ""
+  const options = content.options || []
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
+      <div className="w-full max-w-[500px] px-6">
+        <h2 className="text-[clamp(18px,3vw,24px)] font-sans font-semibold text-[#efeff1] text-center mb-6 leading-tight">{question}</h2>
+        <div className="flex flex-col gap-2">
+          {options.map((opt, i) => (
+            <div key={i} className="relative w-full text-left min-h-[44px] px-4 py-3 border border-[#2a2a35]">
+              <span className="text-[14px] font-sans text-[#7a7a8a]">{opt}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] font-mono text-[#53535f] text-center mt-4">Poll ended</p>
+      </div>
+    </div>
+  )
+}
+
+function FrozenDuetLayout({ slides }: { slides: BatchSlide[] }) {
+  const duetSlides = slides.filter(s => s.type === "duet")
+  if (duetSlides.length === 0) return null
+  const first = duetSlides[0].content as Record<string, unknown>
+  const hostName = first.host_name as string || "Host"
+  const guestName = first.guest_name as string || "Guest"
+
+  return (
+    <div className="w-full h-full flex items-center justify-center overflow-y-auto">
+      <div className="flex flex-col px-8 py-10 gap-4 w-full">
+        <div className="max-w-[600px] w-full mx-auto">
+          <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#7a7a8a]">
+            Duet — {hostName} × {guestName}
+          </span>
+        </div>
+        {duetSlides.map((slide, i) => {
+          const c = slide.content as Record<string, unknown>
+          const speakerName = c.speaker_name as string || "Unknown"
+          const speakerRole = c.speaker_role as string || "host"
+          const text = c.text as string || ""
+          const isHost = speakerRole === "host"
+          const color = isHost ? "#00e5b0" : "#E63946"
+          const label = isHost ? "HOST" : "GUEST"
+          return (
+            <div key={i} className="max-w-[600px] w-full mx-auto">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ color, backgroundColor: color + "15" }}>{label}</span>
+                <span className="text-[12px] font-mono text-[#7a7a8a]">{speakerName}</span>
+              </div>
+              <p className="font-sans leading-relaxed text-[#adadb8] text-[15px]">{text}</p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Render a frozen frame for history — all content revealed, no animation, no interactivity
+function renderFrozenFrame(slide: BatchSlide) {
+  const frame: BroadcastFrame = {
+    type: slide.type as BroadcastFrame["type"],
+    content: slide.content as BroadcastFrame["content"],
+  }
+  switch (frame.type) {
+    case "build":
+      return <FrozenBuildLayout content={frame.content} />
+    case "thread":
+      return <FrozenThreadLayout content={frame.content} />
+    case "poll":
+      return <FrozenPollLayout content={frame.content} />
+    case "text":
+      return <TextView content={frame.content} frameKey="frozen" />
+    case "data":
+      return <DataView content={frame.content} />
+    case "image":
+      return <ImageView content={frame.content} frameKey="frozen" />
+    case "roast":
+      return <RoastView content={frame.content} frameKey="frozen" />
+    default:
+      return null
+  }
+}
+
+// ── History Feed Card ──
+// Shows a completed broadcast — static, no reactions, frozen state
+
+function HistoryFeedCard({ card }: { card: HistoryCard }) {
+  // For duets, show all turns in a single view
+  const hasDuet = card.slides.some(s => s.type === "duet")
+  // For non-duets, show the last meaningful slide (skip polls if there's other content)
+  const displaySlide = hasDuet ? null : card.slides[card.slides.length - 1]
+
+  const slideType = hasDuet ? "duet" : displaySlide?.type || null
+  const viewportBg = displaySlide
+    ? getFrameBgColor({ type: displaySlide.type as BroadcastFrame["type"], content: displaySlide.content as BroadcastFrame["content"] })
+    : undefined
+
+  // Timestamp
+  const timeAgo = formatTimeAgo(card.completedAt)
+
+  return (
+    <div className="w-full max-w-[640px] mx-auto opacity-70 hover:opacity-90 transition-opacity duration-200">
+      {/* Card header */}
+      <div className="flex items-center gap-3 px-1 py-3">
+        <span className="w-[7px] h-[7px] rounded-full shrink-0 bg-[#2a2a35]" />
+        <span className="text-[12px] font-mono text-[#53535f]">{card.streamerName}</span>
+        {slideType && slideType !== "text" && (
+          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#3a3a45]">{slideType}</span>
+        )}
+        <div className="ml-auto">
+          <span className="text-[10px] font-mono text-[#3a3a45]">{timeAgo}</span>
+        </div>
+      </div>
+
+      {/* Card viewport */}
+      <div
+        className="relative w-full aspect-video overflow-hidden"
+        style={{ backgroundColor: viewportBg || "#0e0e10" }}
+      >
+        {hasDuet ? (
+          <FrozenDuetLayout slides={card.slides} />
+        ) : displaySlide ? (
+          renderFrozenFrame(displaySlide)
+        ) : null}
+
+        {/* Static progress bar — all complete */}
+        {card.slides.length > 1 && (
+          <div className="absolute bottom-0 left-0 right-0 px-2 pb-3 pt-1 flex gap-[3px] z-10">
+            {card.slides.map((_, i) => (
+              <div key={i} className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                <div className="h-full w-full bg-white/40 rounded-full" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000)
+  if (seconds < 60) return "just now"
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ago`
+}
+
+// ── Back to Live Pill ──
+
+function BackToLivePill({ onClick, visible }: { onClick: () => void; visible: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#e91916] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] shadow-lg transition-all duration-200 ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4 pointer-events-none"
+      }`}
+      aria-label="Back to live"
+    >
+      <span className="w-2 h-2 rounded-full bg-white live-pulse" />
+      Live
+    </button>
+  )
+}
+
 // ── Main Feed Component ──
 
 export default function Broadcast() {
@@ -1144,7 +1377,11 @@ export default function Broadcast() {
     isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
     activePoll, vote,
     reactions, react,
+    feedHistory, isUserScrolledRef, setIsUserScrolled,
   } = useBroadcastContext()
+
+  const feedRef = useRef<HTMLDivElement>(null)
+  const [showLivePill, setShowLivePill] = useState(false)
 
   // During batch playback, derive the active frame directly from batch state.
   const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
@@ -1178,10 +1415,47 @@ export default function Broadcast() {
     ? currentSlot.streamer_name
     : liveInfo?.streamer_name || null
 
-  const hasContent = !!(activeFrame || isLive)
+  // Scroll tracking
+  useEffect(() => {
+    const feedEl = feedRef.current
+    if (!feedEl) return
+
+    function handleScroll() {
+      const scrollTop = feedEl!.scrollTop
+      const scrolled = scrollTop > 100
+      isUserScrolledRef.current = scrolled
+      setIsUserScrolled(scrolled)
+      setShowLivePill(scrolled && isLive)
+    }
+
+    feedEl.addEventListener("scroll", handleScroll, { passive: true })
+    return () => feedEl.removeEventListener("scroll", handleScroll)
+  }, [isLive, isUserScrolledRef, setIsUserScrolled])
+
+  // Update pill visibility when isLive changes
+  useEffect(() => {
+    if (!isLive) setShowLivePill(false)
+    else if (isUserScrolledRef.current) setShowLivePill(true)
+  }, [isLive, isUserScrolledRef])
+
+  // Auto-scroll to top when new slot starts (only if user is near top)
+  const prevIsLiveRef = useRef(isLive)
+  useEffect(() => {
+    if (isLive && !prevIsLiveRef.current && !isUserScrolledRef.current) {
+      feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+    }
+    prevIsLiveRef.current = isLive
+  }, [isLive, isUserScrolledRef])
+
+  function scrollToLive() {
+    feedRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+    setShowLivePill(false)
+  }
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 overflow-y-auto">
+    <div ref={feedRef} className="relative flex flex-col flex-1 min-w-0 overflow-y-auto">
+      <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
+
       <div className="flex flex-col items-center w-full py-6 px-4 gap-6 min-h-full">
 
         {/* Live card or bumper */}
@@ -1201,6 +1475,11 @@ export default function Broadcast() {
           reactions={reactions}
           react={react}
         />
+
+        {/* History cards */}
+        {feedHistory.map((card) => (
+          <HistoryFeedCard key={card.slotId} card={card} />
+        ))}
 
         {/* Onboarding card — always at bottom, hero when idle */}
         <OnboardingCard />

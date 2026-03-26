@@ -931,8 +931,21 @@ export default function Broadcast() {
     ? { type: currentBatchSlide.type as BroadcastFrame["type"], content: currentBatchSlide.content as BroadcastFrame["content"] }
     : latestFrame
 
-  // Frame key for entrance animations
-  const frameKey = isBatchPlaying ? batchIndex : (activeFrame ? `f-${Date.now()}` : "idle")
+  // Track a stable generation counter for non-batch frames.
+  // Increments only when latestFrame genuinely changes content (new frame event),
+  // NOT on every re-render. Prevents the "glitch" where held content re-triggers
+  // the entrance animation on every state update (slot_end, poll clear, etc).
+  const frameGenRef = useRef(0)
+  const prevFrameRef = useRef<BroadcastFrame | null>(null)
+  if (latestFrame !== prevFrameRef.current) {
+    prevFrameRef.current = latestFrame
+    frameGenRef.current += 1
+  }
+
+  // Frame key for entrance animations.
+  // Batch playback: batchIndex changes per slide → animates each.
+  // Non-batch: stable generation counter → only animates on genuine frame change.
+  const frameKey = isBatchPlaying ? batchIndex : frameGenRef.current
 
   // Viewport background from current frame
   const viewportBg = getFrameBgColor(activeFrame)

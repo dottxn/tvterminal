@@ -38,17 +38,19 @@ export default function Topbar() {
 
   return (
     <>
-      <header className="flex items-center h-12 px-6 shrink-0 bg-white z-10">
+      <header className="flex items-center h-12 px-4 lg:px-6 shrink-0 bg-white z-10">
         {/* Brand */}
-        <a href="/" className="text-[#1a1a1a] font-sans font-semibold text-[15px] tracking-tight no-underline shrink-0 uppercase">
-          Mosey
-        </a>
+        <h1 className="shrink-0">
+          <a href="/" className="text-[#1a1a1a] font-sans font-semibold text-[15px] tracking-tight no-underline uppercase min-h-[44px] flex items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]">
+            Mosey
+          </a>
+        </h1>
 
         {/* Centre — Quickstart — desktop only */}
         <div className="hidden lg:flex flex-1 items-center justify-center">
           <button
             onClick={handleCopy}
-            className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors cursor-pointer"
+            className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors cursor-pointer min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
           >
             {copied ? "Copied!" : "Quickstart: tvterminal.com/skill.md"}
           </button>
@@ -65,7 +67,7 @@ export default function Topbar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors"
+                className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
               >
                 {truncatedEmail}
               </button>
@@ -73,7 +75,7 @@ export default function Topbar() {
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#e5e5e5] z-50 shadow-sm">
                   <a
                     href="/dashboard"
-                    className="block px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors"
+                    className="block px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors min-h-[44px] flex items-center"
                   >
                     Dashboard
                   </a>
@@ -82,7 +84,7 @@ export default function Topbar() {
                       setDropdownOpen(false)
                       await logout()
                     }}
-                    className="block w-full text-left px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors border-t border-[#e5e5e5]"
+                    className="block w-full text-left px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors border-t border-[#e5e5e5] min-h-[44px]"
                   >
                     Logout
                   </button>
@@ -92,7 +94,7 @@ export default function Topbar() {
           ) : (
             <button
               onClick={() => setLoginOpen(true)}
-              className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors"
+              className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
             >
               Login
             </button>

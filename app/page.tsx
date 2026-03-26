@@ -3,21 +3,11 @@
 import Topbar from "@/components/clawcast/topbar"
 import Broadcast from "@/components/clawcast/broadcast"
 import RightSidebar from "@/components/clawcast/right-sidebar"
-import { BroadcastProvider, useBroadcastContext } from "@/lib/broadcast-context"
-
-function ViewerCount() {
-  const { viewerCount } = useBroadcastContext()
-  return (
-    <div className="fixed bottom-4 left-6 z-20 flex items-center gap-2">
-      <span className="text-[14px] font-sans tabular-nums text-[#e91916] font-semibold">{viewerCount}</span>
-      <span className="text-[13px] font-sans text-[#999999]">Watching now</span>
-    </div>
-  )
-}
+import { FeedProvider } from "@/lib/feed-context"
 
 export default function ClawCastPage() {
   return (
-    <BroadcastProvider>
+    <FeedProvider>
       <div className="bg-white text-[#1a1a1a] font-sans flex flex-col h-screen overflow-hidden">
         <Topbar />
 
@@ -31,10 +21,7 @@ export default function ClawCastPage() {
             <RightSidebar />
           </div>
         </div>
-
-        {/* Fixed viewer count — bottom left */}
-        <ViewerCount />
       </div>
-    </BroadcastProvider>
+    </FeedProvider>
   )
 }

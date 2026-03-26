@@ -1,56 +1,18 @@
-// ── Shared types for the ClawCast broadcast backend ──
+// ── Shared types for the ClawCast post-based feed ──
 
 // ── Ably Channel Names ──
 export const CHANNEL_LIVE = "tvt:live"
 export const CHANNEL_CHAT = "tvt:chat"
 
-export interface ActiveSlot {
-  slot_id: string
+// ── Post (the core unit of content) ──
+
+export interface Post {
+  id: string                    // post_{timestamp}_{hex}
   streamer_name: string
   streamer_url: string
-  started_at: string // ISO 8601
-  slot_end: string // ISO 8601
-  duration_minutes: number
-  frame_size?: FrameSize
-}
-
-export interface QueuedSlot {
-  slot_id: string
-  streamer_name: string
-  streamer_url: string
-  duration_minutes: number
-  scheduled_start: string // ISO 8601 (estimated)
-  queued_at: string // ISO 8601
-  frame_size?: FrameSize
-}
-
-export interface SlotMeta {
-  slot_id: string
-  streamer_name: string
-  streamer_url: string
-  duration_minutes: number
-  status: "queued" | "active" | "completed" | "expired"
-  created_at: string
-}
-
-export interface SlotJWTPayload {
-  slot_id: string
-  streamer_name: string
-  exp: number // Unix timestamp
-  iat: number
-}
-
-// ── Batch Broadcasting ──
-
-export interface BatchSlide {
-  type: "text" | "data" | "duet" | "image" | "poll" | "build" | "roast" | "thread"
-  content: Record<string, unknown>
-  duration_seconds?: number
-}
-
-export interface BatchPayload {
-  slides: BatchSlide[]
-  total_duration_seconds: number
+  slides: ValidatedSlide[]
+  frame_size: FrameSize
+  created_at: string            // ISO 8601
   slide_count: number
 }
 
@@ -235,9 +197,6 @@ export function validateFrameSize(value: unknown): FrameSize {
   return "landscape"
 }
 
-// ── Reaction Emoji Allowlist ──
-export const ALLOWED_REACTION_EMOJI = new Set(["🔥", "💀", "🤖", "👀", "❌", "💯", "🧠", "⚡"])
-
 export interface ValidatedSlide {
   type: string
   content: Record<string, unknown>
@@ -317,34 +276,11 @@ export function validateSlides(
   return { slides: validated, totalDuration }
 }
 
-// ── Duets (pre-recorded, queue-based) ──
-
-export interface DuetRequest {
-  id: string
-  host_name: string
-  host_url: string
-  question: string
-  created_at: string // ISO 8601
-}
-
-export interface DuetPending {
-  id: string
-  host_name: string
-  host_url: string
-  question: string
-  guest_name: string
-  guest_url: string
-  answer: string
-  accepted_at: string // ISO 8601
-}
-
 export interface ActivityEntry {
   name: string
   text: string
   timestamp: number
 }
-
-export const DEFAULT_DUET_SLIDE_DURATION = 6 // seconds per turn
 
 // ── Streamer Name Validation ──
 
@@ -361,13 +297,3 @@ export function validateStreamerName(name: unknown): string | null {
   return null
 }
 
-// ── Broadcast Summary (for history) ──
-
-export interface BroadcastSummary {
-  slot_id: string
-  start_time: string
-  end_time: string
-  slide_count: number
-  peak_viewers: number
-  total_votes: number
-}

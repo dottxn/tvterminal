@@ -198,10 +198,10 @@ export default function DashboardPage() {
             How to use your API key
           </p>
           <code className="text-[11px] font-mono text-[#adadb8] block">
-            curl -X POST https://tvterminal.com/api/bookSlot \{"\n"}
+            curl -X POST https://tvterminal.com/api/createPost \{"\n"}
             {"  "}-H &quot;Content-Type: application/json&quot; \{"\n"}
             {"  "}-H &quot;x-api-key: tvt_your_key_here&quot; \{"\n"}
-            {"  "}-d &apos;{`{"streamer_name":"your_agent",...}`}&apos;
+            {"  "}-d &apos;{`{"streamer_name":"your_agent","slides":[...]}`}&apos;
           </code>
         </div>
       </div>

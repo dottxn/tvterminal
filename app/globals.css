@@ -86,19 +86,6 @@
 }
 .ticker-track { animation: ticker-scroll 55s linear infinite; }
 
-/* ── Live pulse ── */
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(233,25,22,0.5); }
-  50%       { opacity: 0.75; box-shadow: 0 0 0 4px rgba(233,25,22,0); }
-}
-.live-pulse { animation: live-pulse 1.6s ease-in-out infinite; }
-
-/* ── Purple glow pulse ── */
-@keyframes purple-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(230,57,70,0.4); }
-  60%       { box-shadow: 0 0 0 5px rgba(230,57,70,0); }
-}
-.purple-pulse { animation: purple-pulse 2s ease-out infinite; }
 
 /* ── Chat message pop-in ── */
 @keyframes msg-in {
@@ -107,26 +94,6 @@
 }
 .msg-in { animation: msg-in 0.18s ease-out forwards; }
 
-/* ── Viewer count tick ── */
-@keyframes count-tick {
-  0%   { transform: translateY(0); }
-  40%  { transform: translateY(-3px); }
-  100% { transform: translateY(0); }
-}
-.count-tick { animation: count-tick 0.25s ease-out; }
-
-/* ── Energy bar fill ── */
-@keyframes bar-fill {
-  from { width: 0%; }
-}
-.bar-fill { animation: bar-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-
-/* ── Batch progress bar (IG stories style) ── */
-@keyframes bar-progress {
-  from { width: 0%; }
-  to   { width: 100%; }
-}
-.bar-progress { animation: bar-progress linear forwards; /* duration via inline style */ }
 
 /* ── Text view entrance ── */
 @keyframes text-view-enter {
@@ -135,48 +102,6 @@
 }
 .text-view-enter { animation: text-view-enter 0.3s ease-out forwards; }
 
-@keyframes typing-bounce {
-  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-4px); }
-}
-.typing-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: typing-bounce 1.4s ease-in-out infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-/* ── Notification slide-in from right ── */
-@keyframes notif-enter {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes notif-exit {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(24px); }
-}
-.notif-enter { animation: notif-enter 0.25s ease-out forwards; }
-.notif-exit  { animation: notif-exit 0.2s ease-in forwards; }
-
-/* ── Build step enter ── */
-@keyframes build-step-enter {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.build-step-enter { animation: build-step-enter 0.25s ease-out forwards; }
-
-/* ── Floating reaction ── */
-@keyframes floatUp {
-  0%   { transform: translateY(0) scale(0.5); opacity: 0; }
-  10%  { transform: translateY(-20px) scale(1); opacity: 1; }
-  80%  { opacity: 1; }
-  100% { transform: translateY(-200px) scale(1.1); opacity: 0; }
-}
-.reaction-enter { animation: floatUp 3s ease-out forwards; }
 
 /* ── Feed card entrance (new cards slide up from below) ── */
 @keyframes card-enter {
@@ -184,13 +109,6 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .card-enter { animation: card-enter 0.3s ease-out forwards; }
-
-/* ── Back to Live pill slide down ── */
-@keyframes pill-enter {
-  from { opacity: 0; transform: translate(-50%, -16px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
-}
-.pill-enter { animation: pill-enter 0.2s ease-out forwards; }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {

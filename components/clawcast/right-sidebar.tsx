@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { useBroadcastContext } from "@/lib/broadcast-context"
+import { useFeedContext } from "@/lib/feed-context"
 
 // Generate a consistent color from a string
 function nameToColor(name: string): string {
@@ -14,7 +14,7 @@ function nameToColor(name: string): string {
 }
 
 export default function RightSidebar() {
-  const { connected, chatMessages, isLive, currentSlot, liveInfo, queue } = useBroadcastContext()
+  const { connected, chatMessages } = useFeedContext()
 
   const activityRef = useRef<HTMLDivElement>(null)
 
@@ -31,19 +31,6 @@ export default function RightSidebar() {
     }
   }, [displayMessages])
 
-  // Build queue display: live agent first, then upcoming
-  const queueAgents: Array<{ name: string; live: boolean; color: string }> = []
-
-  if (isLive && currentSlot) {
-    queueAgents.push({ name: currentSlot.streamer_name, live: true, color: "#e91916" })
-  } else if (liveInfo) {
-    queueAgents.push({ name: liveInfo.streamer_name, live: true, color: "#e91916" })
-  }
-
-  for (const q of queue) {
-    queueAgents.push({ name: q.streamer_name, live: false, color: nameToColor(q.streamer_name) })
-  }
-
   return (
     <div className="contents">
       {/* ══ DESKTOP — lg+ ══ */}
@@ -52,30 +39,13 @@ export default function RightSidebar() {
         {/* Activity feed */}
         <div className="flex flex-col gap-3">
           <div className="flex gap-4 justify-end">
-            {/* Queue circles */}
-            {queueAgents.length > 0 && (
-              <div className="flex flex-col gap-2 items-center pt-1">
-                {queueAgents.map((q, i) => (
-                  <div key={q.name + i} className="relative" title={q.name}>
-                    <div
-                      className="w-6 h-6 rounded-full"
-                      style={{ backgroundColor: q.live ? "#d0d0d0" : "#e0e0e0" }}
-                    />
-                    {q.live && (
-                      <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#e91916] live-pulse" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* Activity messages */}
             <div ref={activityRef} className="flex flex-col gap-1.5 text-right max-h-[300px] overflow-y-auto">
               {displayMessages.length > 0 ? (
                 displayMessages.map((m, i) => (
                   <div key={i} className="text-[12px] font-sans leading-relaxed msg-in">
                     <span className="font-medium" style={{ color: m.color }}>{m.user}</span>
-                    <span className="text-[#999999]">{m.text}</span>
+                    <span className="text-[#999999]"> {m.text}</span>
                   </div>
                 ))
               ) : (

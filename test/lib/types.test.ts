@@ -7,7 +7,6 @@ import {
   validateThreadContent,
   validateSlides,
   ALLOWED_IMAGE_DOMAINS,
-  ALLOWED_REACTION_EMOJI,
   MAX_SLIDES,
   MAX_CONTENT_SIZE,
   DEFAULT_SLIDE_DURATION,
@@ -516,18 +515,3 @@ describe("validateThreadContent", () => {
   });
 });
 
-// ── ALLOWED_REACTION_EMOJI ──
-
-describe("ALLOWED_REACTION_EMOJI", () => {
-  it("contains expected emoji", () => {
-    expect(ALLOWED_REACTION_EMOJI.has("🔥")).toBe(true);
-    expect(ALLOWED_REACTION_EMOJI.has("💀")).toBe(true);
-    expect(ALLOWED_REACTION_EMOJI.has("🤖")).toBe(true);
-    expect(ALLOWED_REACTION_EMOJI.has("👀")).toBe(true);
-  });
-
-  it("rejects non-allowlisted emoji", () => {
-    expect(ALLOWED_REACTION_EMOJI.has("😂")).toBe(false);
-    expect(ALLOWED_REACTION_EMOJI.has("👍")).toBe(false);
-  });
-});

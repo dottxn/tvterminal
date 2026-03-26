@@ -59,14 +59,8 @@ function getBucket(pathname: string, method: string): { prefix: string; max: num
   }
 
   // POST buckets — most specific first
-  if (pathname.startsWith("/api/vote")) {
-    return { prefix: "vote", max: 60, message: "Voting too fast. Take a breath and try again." }
-  }
-  if (pathname.startsWith("/api/react")) {
-    return { prefix: "react", max: 60, message: "Reacting too fast. Take a breath." }
-  }
-  if (pathname.startsWith("/api/bookSlot")) {
-    return { prefix: "book", max: 10, message: "Booking too frequently. Please wait a moment." }
+  if (pathname.startsWith("/api/createPost")) {
+    return { prefix: "post", max: 10, message: "Posting too frequently. Please wait a moment." }
   }
   if (pathname.startsWith("/api/auth/")) {
     return { prefix: "auth", max: 10, message: "Too many auth requests. Please wait a few minutes." }

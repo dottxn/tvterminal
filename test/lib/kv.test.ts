@@ -10,31 +10,8 @@ const mockRedis = {
   lpush: vi.fn(),
   ltrim: vi.fn(),
   lrange: vi.fn(),
-  lpop: vi.fn(),
-  llen: vi.fn(),
-  rpush: vi.fn(),
-  eval: vi.fn(),
-  sadd: vi.fn(),
-  srem: vi.fn(),
-  smembers: vi.fn(),
-  hgetall: vi.fn(),
-  hset: vi.fn(),
-  hincrby: vi.fn(),
-  hget: vi.fn(),
-  setnx: vi.fn(),
-  pipeline: vi.fn(() => ({
-    get: vi.fn().mockReturnThis(),
-    del: vi.fn().mockReturnThis(),
-    hincrby: vi.fn().mockReturnThis(),
-    hset: vi.fn().mockReturnThis(),
-    zadd: vi.fn().mockReturnThis(),
-    zremrangebyrank: vi.fn().mockReturnThis(),
-    exec: vi.fn().mockResolvedValue([]),
-  })),
   zadd: vi.fn(),
   zrange: vi.fn(),
-  zremrangebyrank: vi.fn(),
-  sismember: vi.fn(),
 }
 
 vi.mock("@/lib/redis", () => ({
@@ -43,32 +20,10 @@ vi.mock("@/lib/redis", () => ({
 }))
 
 import {
-  acquireTransitionLock,
-  releaseTransitionLock,
-  getActiveSlot,
-  setActiveSlot,
-  clearActiveSlot,
-  pushToQueue,
-  popFromQueue,
-  getQueue,
-  getQueueLength,
-  getSlotMeta,
-  setSlotMeta,
-  incrementFrameCount,
-  getFrameCount,
-  setLastFrameType,
-  getLastFrameType,
-  setLastFrameTime,
-  getLastFrameTime,
-  setBatchMode,
-  getBatchMode,
-  setBatchSlides,
-  getBatchSlides,
-  setPendingBatch,
-  getPendingBatch,
-  deletePendingBatch,
-  updatePeakViewers,
-  getPeakViewers,
+  createPost,
+  getPost,
+  getFeedPosts,
+  getAgentPosts,
   pushActivity,
   getRecentActivity,
   logDeprecatedFormat,
@@ -78,382 +33,142 @@ import {
   getValidationErrors,
 } from "@/lib/kv"
 
-import type { ActiveSlot, QueuedSlot, SlotMeta, BroadcastContentMetadata, ValidationErrorEntry } from "@/lib/types"
+import type { Post, BroadcastContentMetadata, ValidationErrorEntry } from "@/lib/types"
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 // ══════════════════════════════════════════
-// Distributed Lock
+// Post Storage
 // ══════════════════════════════════════════
 
-describe("acquireTransitionLock", () => {
-  it("returns true when SET NX succeeds", async () => {
+function makePost(overrides: Partial<Post> = {}): Post {
+  return {
+    id: "post_1234_abcd",
+    streamer_name: "test-agent",
+    streamer_url: "https://test.com",
+    slides: [{ type: "text", content: { body: "hello" }, duration_seconds: 8 }],
+    frame_size: "square",
+    created_at: "2025-01-01T00:00:00.000Z",
+    slide_count: 1,
+    ...overrides,
+  }
+}
+
+describe("createPost", () => {
+  it("stores post and adds to feed + agent sorted sets", async () => {
     mockRedis.set.mockResolvedValue("OK")
-    const result = await acquireTransitionLock()
-    expect(result).toBe(true)
-    expect(mockRedis.set).toHaveBeenCalledWith("tvt:transition_lock", "1", { nx: true, ex: 15 })
-  })
+    mockRedis.zadd.mockResolvedValue(1)
+    const post = makePost()
 
-  it("returns false when SET NX fails (lock held)", async () => {
-    mockRedis.set.mockResolvedValue(null)
-    const result = await acquireTransitionLock()
-    expect(result).toBe(false)
+    await createPost(post)
+
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      "tvt:post:post_1234_abcd",
+      JSON.stringify(post)
+    )
+    expect(mockRedis.zadd).toHaveBeenCalledWith("tvt:feed", {
+      score: Date.parse(post.created_at),
+      member: post.id,
+    })
+    expect(mockRedis.zadd).toHaveBeenCalledWith("tvt:agent_posts:test-agent", {
+      score: Date.parse(post.created_at),
+      member: post.id,
+    })
   })
 })
 
-describe("releaseTransitionLock", () => {
-  it("deletes the lock key", async () => {
-    mockRedis.del.mockResolvedValue(1)
-    await releaseTransitionLock()
-    expect(mockRedis.del).toHaveBeenCalledWith("tvt:transition_lock")
-  })
-})
-
-// ══════════════════════════════════════════
-// Active Slot
-// ══════════════════════════════════════════
-
-describe("getActiveSlot", () => {
-  it("returns null when no active slot", async () => {
+describe("getPost", () => {
+  it("returns null when no post exists", async () => {
     mockRedis.get.mockResolvedValue(null)
-    const result = await getActiveSlot()
+    const result = await getPost("nonexistent")
     expect(result).toBeNull()
   })
 
-  it("returns the active slot", async () => {
-    const slot: ActiveSlot = {
-      slot_id: "s1",
-      streamer_name: "bot",
-      streamer_url: "https://bot.com",
-      started_at: new Date().toISOString(),
-      slot_end: new Date().toISOString(),
-      duration_minutes: 1,
-    }
-    mockRedis.get.mockResolvedValue(slot)
-    const result = await getActiveSlot()
-    expect(result).toEqual(slot)
+  it("returns parsed post when stored as string", async () => {
+    const post = makePost()
+    mockRedis.get.mockResolvedValue(JSON.stringify(post))
+    const result = await getPost("post_1234_abcd")
+    expect(result).toEqual(post)
+  })
+
+  it("returns post when Redis auto-parses object", async () => {
+    const post = makePost()
+    mockRedis.get.mockResolvedValue(post)
+    const result = await getPost("post_1234_abcd")
+    expect(result).toEqual(post)
   })
 })
 
-describe("setActiveSlot", () => {
-  it("stores serialized slot", async () => {
-    const slot: ActiveSlot = {
-      slot_id: "s1",
-      streamer_name: "bot",
-      streamer_url: "https://bot.com",
-      started_at: new Date().toISOString(),
-      slot_end: new Date().toISOString(),
-      duration_minutes: 1,
-    }
-    mockRedis.set.mockResolvedValue("OK")
-    await setActiveSlot(slot)
-    expect(mockRedis.set).toHaveBeenCalledWith("tvt:active_slot", JSON.stringify(slot))
-  })
-})
-
-describe("clearActiveSlot", () => {
-  it("deletes active slot key", async () => {
-    mockRedis.del.mockResolvedValue(1)
-    await clearActiveSlot()
-    expect(mockRedis.del).toHaveBeenCalledWith("tvt:active_slot")
-  })
-})
-
-// ══════════════════════════════════════════
-// Queue
-// ══════════════════════════════════════════
-
-describe("pushToQueue", () => {
-  it("rpushes serialized slot to queue", async () => {
-    const slot: QueuedSlot = {
-      slot_id: "q1",
-      streamer_name: "agent",
-      streamer_url: "https://agent.com",
-      duration_minutes: 1,
-    }
-    mockRedis.rpush.mockResolvedValue(1)
-    await pushToQueue(slot)
-    expect(mockRedis.rpush).toHaveBeenCalledWith("tvt:queue", JSON.stringify(slot))
-  })
-})
-
-describe("popFromQueue", () => {
-  it("returns null when queue is empty", async () => {
-    mockRedis.lpop.mockResolvedValue(null)
-    const result = await popFromQueue()
-    expect(result).toBeNull()
-  })
-
-  it("returns parsed slot from queue", async () => {
-    const slot: QueuedSlot = {
-      slot_id: "q1",
-      streamer_name: "agent",
-      streamer_url: "https://agent.com",
-      duration_minutes: 1,
-    }
-    mockRedis.lpop.mockResolvedValue(JSON.stringify(slot))
-    const result = await popFromQueue()
-    expect(result).toEqual(slot)
-  })
-})
-
-describe("getQueue", () => {
-  it("returns empty array when queue is empty", async () => {
-    mockRedis.lrange.mockResolvedValue([])
-    const result = await getQueue()
+describe("getFeedPosts", () => {
+  it("returns empty array when feed is empty", async () => {
+    mockRedis.zrange.mockResolvedValue([])
+    const result = await getFeedPosts(20)
     expect(result).toEqual([])
   })
 
-  it("returns parsed queue items", async () => {
-    const slot1: QueuedSlot = { slot_id: "q1", streamer_name: "a1", streamer_url: "", duration_minutes: 1 }
-    const slot2: QueuedSlot = { slot_id: "q2", streamer_name: "a2", streamer_url: "", duration_minutes: 1 }
-    mockRedis.lrange.mockResolvedValue([JSON.stringify(slot1), JSON.stringify(slot2)])
-    const result = await getQueue()
-    expect(result).toHaveLength(2)
-    expect(result[0].slot_id).toBe("q1")
-    expect(result[1].slot_id).toBe("q2")
-  })
-})
+  it("fetches posts by IDs from sorted set", async () => {
+    const post = makePost()
+    mockRedis.zrange.mockResolvedValue(["post_1234_abcd"])
+    mockRedis.get.mockResolvedValue(JSON.stringify(post))
 
-describe("getQueueLength", () => {
-  it("returns the queue length", async () => {
-    mockRedis.llen.mockResolvedValue(3)
-    const result = await getQueueLength()
-    expect(result).toBe(3)
-  })
-})
-
-// ══════════════════════════════════════════
-// Slot Metadata
-// ══════════════════════════════════════════
-
-describe("getSlotMeta", () => {
-  it("returns null when no meta exists", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getSlotMeta("s1")
-    expect(result).toBeNull()
+    const result = await getFeedPosts(20)
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe("post_1234_abcd")
   })
 
-  it("returns slot meta", async () => {
-    const meta: SlotMeta = {
-      slot_id: "s1",
-      streamer_name: "bot",
-      created_at: new Date().toISOString(),
-      status: "active",
-    }
-    mockRedis.get.mockResolvedValue(meta)
-    const result = await getSlotMeta("s1")
-    expect(result?.status).toBe("active")
-  })
-})
-
-describe("setSlotMeta", () => {
-  it("stores meta with 1-hour TTL", async () => {
-    const meta: SlotMeta = {
-      slot_id: "s1",
-      streamer_name: "bot",
-      created_at: new Date().toISOString(),
-      status: "active",
-    }
-    mockRedis.set.mockResolvedValue("OK")
-    await setSlotMeta("s1", meta)
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      "tvt:slot:s1",
-      JSON.stringify(meta),
-      { ex: 3600 }
-    )
-  })
-})
-
-// ══════════════════════════════════════════
-// Frame Tracking
-// ══════════════════════════════════════════
-
-describe("incrementFrameCount", () => {
-  it("increments and sets TTL on first frame", async () => {
-    mockRedis.incr.mockResolvedValue(1)
-    mockRedis.expire.mockResolvedValue(1)
-    const count = await incrementFrameCount("s1")
-    expect(count).toBe(1)
-    expect(mockRedis.incr).toHaveBeenCalledWith("tvt:frames:s1")
-    expect(mockRedis.expire).toHaveBeenCalledWith("tvt:frames:s1", 3600)
-  })
-
-  it("does not set TTL on subsequent frames", async () => {
-    mockRedis.incr.mockResolvedValue(5)
-    const count = await incrementFrameCount("s1")
-    expect(count).toBe(5)
-    expect(mockRedis.expire).not.toHaveBeenCalled()
-  })
-})
-
-describe("getFrameCount", () => {
-  it("returns 0 when no frames", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const count = await getFrameCount("s1")
-    expect(count).toBe(0)
-  })
-
-  it("returns frame count", async () => {
-    mockRedis.get.mockResolvedValue(10)
-    const count = await getFrameCount("s1")
-    expect(count).toBe(10)
-  })
-})
-
-describe("setLastFrameType / getLastFrameType", () => {
-  it("stores frame type with TTL", async () => {
-    mockRedis.set.mockResolvedValue("OK")
-    await setLastFrameType("s1", "text")
-    expect(mockRedis.set).toHaveBeenCalledWith("tvt:last_type:s1", "text", { ex: 3600 })
-  })
-
-  it("returns stored type", async () => {
-    mockRedis.get.mockResolvedValue("text")
-    const type = await getLastFrameType("s1")
-    expect(type).toBe("text")
-  })
-
-  it("returns null when not set", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const type = await getLastFrameType("s1")
-    expect(type).toBeNull()
-  })
-})
-
-// ══════════════════════════════════════════
-// Idle Tracking
-// ══════════════════════════════════════════
-
-describe("setLastFrameTime / getLastFrameTime", () => {
-  it("stores current timestamp with TTL", async () => {
-    mockRedis.set.mockResolvedValue("OK")
-    const before = Date.now()
-    await setLastFrameTime("s1")
-    const call = mockRedis.set.mock.calls[0]
-    expect(call[0]).toBe("tvt:last_frame_at:s1")
-    expect(call[1]).toBeGreaterThanOrEqual(before)
-    expect(call[2]).toEqual({ ex: 3600 })
-  })
-
-  it("returns null when not set", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const ts = await getLastFrameTime("s1")
-    expect(ts).toBeNull()
-  })
-
-  it("returns stored timestamp", async () => {
-    const ts = Date.now()
-    mockRedis.get.mockResolvedValue(ts)
-    const result = await getLastFrameTime("s1")
-    expect(result).toBe(ts)
-  })
-})
-
-// ══════════════════════════════════════════
-// Batch Mode
-// ══════════════════════════════════════════
-
-describe("setBatchMode / getBatchMode", () => {
-  it("stores batch end time with TTL", async () => {
-    const endAt = new Date().toISOString()
-    mockRedis.set.mockResolvedValue("OK")
-    await setBatchMode("s1", endAt)
-    expect(mockRedis.set).toHaveBeenCalledWith("tvt:batch_end:s1", endAt, { ex: 3600 })
-  })
-
-  it("returns batch end time", async () => {
-    const endAt = new Date().toISOString()
-    mockRedis.get.mockResolvedValue(endAt)
-    const result = await getBatchMode("s1")
-    expect(result).toBe(endAt)
-  })
-
-  it("returns null when not in batch mode", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getBatchMode("s1")
-    expect(result).toBeNull()
-  })
-})
-
-describe("setBatchSlides / getBatchSlides", () => {
-  it("stores slides with started_at", async () => {
-    const slides = [{ type: "text" }]
-    const startedAt = Date.now()
-    mockRedis.set.mockResolvedValue("OK")
-    await setBatchSlides("s1", slides, startedAt)
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      "tvt:batch_slides:s1",
-      JSON.stringify({ slides, started_at: startedAt }),
-      { ex: 3600 }
+  it("uses before cursor when provided", async () => {
+    mockRedis.zrange.mockResolvedValue([])
+    await getFeedPosts(20, 1704067200000)
+    expect(mockRedis.zrange).toHaveBeenCalledWith(
+      "tvt:feed",
+      1704067200000 - 1,
+      "-inf",
+      { byScore: true, rev: true, offset: 0, count: 20 }
     )
   })
 
-  it("returns null when no batch slides", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getBatchSlides("s1")
-    expect(result).toBeNull()
-  })
-})
-
-// ══════════════════════════════════════════
-// Pending Batch
-// ══════════════════════════════════════════
-
-describe("setPendingBatch / getPendingBatch / deletePendingBatch", () => {
-  it("stores pending batch with TTL", async () => {
-    const slides = [{ type: "text" }]
-    mockRedis.set.mockResolvedValue("OK")
-    await setPendingBatch("s1", slides)
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      "tvt:pending_batch:s1",
-      JSON.stringify(slides),
-      { ex: 3600 }
+  it("uses +inf when no cursor", async () => {
+    mockRedis.zrange.mockResolvedValue([])
+    await getFeedPosts(10)
+    expect(mockRedis.zrange).toHaveBeenCalledWith(
+      "tvt:feed",
+      "+inf",
+      "-inf",
+      { byScore: true, rev: true, offset: 0, count: 10 }
     )
   })
 
-  it("returns null when no pending batch", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getPendingBatch("s1")
-    expect(result).toBeNull()
-  })
+  it("skips null posts (deleted/corrupted)", async () => {
+    mockRedis.zrange.mockResolvedValue(["post_good", "post_gone"])
+    const post = makePost({ id: "post_good" })
+    mockRedis.get
+      .mockResolvedValueOnce(JSON.stringify(post)) // post_good
+      .mockResolvedValueOnce(null) // post_gone
 
-  it("deletes pending batch", async () => {
-    mockRedis.del.mockResolvedValue(1)
-    await deletePendingBatch("s1")
-    expect(mockRedis.del).toHaveBeenCalledWith("tvt:pending_batch:s1")
+    const result = await getFeedPosts(20)
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe("post_good")
   })
 })
 
-// ══════════════════════════════════════════
-// Peak Viewers (Lua script)
-// ══════════════════════════════════════════
+describe("getAgentPosts", () => {
+  it("returns empty array when agent has no posts", async () => {
+    mockRedis.zrange.mockResolvedValue([])
+    const result = await getAgentPosts("test-agent", 20)
+    expect(result).toEqual([])
+  })
 
-describe("updatePeakViewers", () => {
-  it("calls Lua eval with correct args", async () => {
-    mockRedis.eval.mockResolvedValue(42)
-    await updatePeakViewers("s1", 42)
-    expect(mockRedis.eval).toHaveBeenCalledWith(
-      expect.stringContaining("local key = KEYS[1]"),
-      ["tvt:peak_viewers:s1"],
-      [42, 3600]
+  it("queries agent-specific sorted set", async () => {
+    mockRedis.zrange.mockResolvedValue([])
+    await getAgentPosts("cool-bot", 10, 1704067200000)
+    expect(mockRedis.zrange).toHaveBeenCalledWith(
+      "tvt:agent_posts:cool-bot",
+      1704067200000 - 1,
+      "-inf",
+      { byScore: true, rev: true, offset: 0, count: 10 }
     )
-  })
-})
-
-describe("getPeakViewers", () => {
-  it("returns 0 when no data", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getPeakViewers("s1")
-    expect(result).toBe(0)
-  })
-
-  it("returns stored peak", async () => {
-    mockRedis.get.mockResolvedValue(100)
-    const result = await getPeakViewers("s1")
-    expect(result).toBe(100)
   })
 })
 
@@ -463,7 +178,7 @@ describe("getPeakViewers", () => {
 
 describe("pushActivity", () => {
   it("lpushes entry and trims to 50", async () => {
-    const entry = { name: "bot", text: "went live", timestamp: Date.now() }
+    const entry = { name: "bot", text: "posted", timestamp: Date.now() }
     mockRedis.lpush.mockResolvedValue(1)
     mockRedis.ltrim.mockResolvedValue("OK")
     await pushActivity(entry)
@@ -480,7 +195,7 @@ describe("getRecentActivity", () => {
   })
 
   it("parses activity entries", async () => {
-    const entry = { name: "bot", text: "went live", timestamp: 123 }
+    const entry = { name: "bot", text: "posted", timestamp: 123 }
     mockRedis.lrange.mockResolvedValue([JSON.stringify(entry)])
     const result = await getRecentActivity()
     expect(result).toHaveLength(1)
@@ -541,7 +256,7 @@ describe("logValidationError", () => {
   it("lpushes error and trims to 100", async () => {
     const entry: ValidationErrorEntry = {
       timestamp: Date.now(),
-      endpoint: "/api/bookSlot",
+      endpoint: "/api/createPost",
       agent_name: "bot",
       error_type: "invalid_slide",
       error_message: "bad type",
@@ -557,7 +272,7 @@ describe("logValidationError", () => {
     mockRedis.lpush.mockRejectedValue(new Error("Redis down"))
     const entry: ValidationErrorEntry = {
       timestamp: Date.now(),
-      endpoint: "/api/bookSlot",
+      endpoint: "/api/createPost",
       agent_name: "bot",
       error_type: "invalid_slide",
       error_message: "bad type",
@@ -577,7 +292,7 @@ describe("getValidationErrors", () => {
   it("parses error entries", async () => {
     const entry: ValidationErrorEntry = {
       timestamp: 123,
-      endpoint: "/api/bookSlot",
+      endpoint: "/api/createPost",
       agent_name: "bot",
       error_type: "invalid_slide",
       error_message: "bad",

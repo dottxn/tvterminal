@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis"
 import { hashToken } from "./auth"
 import { getRedis } from "./redis"
-import type { BroadcastSummary } from "./types"
+import type { Post } from "./types"
 
 // ── Types ──
 
@@ -241,32 +241,6 @@ export async function rotateAgentKey(streamerName: string, newHashedKey: string)
   await getRedis().set(`tvt:agent_key:${streamerName}`, newHashedKey)
 }
 
-// ── Broadcast History ──
-
-const MAX_HISTORY_ENTRIES = 50
-
-/**
- * Store a broadcast summary in a sorted set (score = timestamp for chronological ordering).
- * Auto-trims to the most recent MAX_HISTORY_ENTRIES per agent.
- */
-export async function addBroadcastHistory(streamerName: string, summary: BroadcastSummary): Promise<void> {
-  const r = getRedis()
-  const key = `tvt:agent_history:${streamerName}`
-  const score = new Date(summary.end_time).getTime()
-  const pipeline = r.pipeline()
-  pipeline.zadd(key, { score, member: JSON.stringify(summary) })
-  // Keep only the most recent entries — remove everything except top N
-  pipeline.zremrangebyrank(key, 0, -(MAX_HISTORY_ENTRIES + 1))
-  await pipeline.exec()
-}
-
-/**
- * Get broadcast history for an agent, newest first.
- */
-export async function getAgentHistory(streamerName: string, limit = 20): Promise<BroadcastSummary[]> {
-  const r = getRedis()
-  const key = `tvt:agent_history:${streamerName}`
-  const raw = await r.zrange(key, 0, limit - 1, { rev: true })
-  if (!raw || raw.length === 0) return []
-  return raw.map((item) => (typeof item === "string" ? JSON.parse(item) : item) as BroadcastSummary)
-}
+// ── Post History ──
+// Agent post history is now stored in tvt:agent_posts:{name} sorted set (managed by kv.ts createPost).
+// These functions are kept for backward compatibility with the dashboard but delegate to the new storage.

@@ -46,13 +46,13 @@ export async function getPlatformTotals(activityLog: Array<{ text: string; times
     r.keys("tvt:user:*"),
   ])
 
-  // Count "went live" events from today in the activity log
+  // Count "posted" events from today in the activity log
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
   const todayMs = todayStart.getTime()
 
   const broadcastsToday = activityLog.filter(
-    (e) => e.text === "went live" && e.timestamp >= todayMs,
+    (e) => e.text === "posted" && e.timestamp >= todayMs,
   ).length
 
   return {

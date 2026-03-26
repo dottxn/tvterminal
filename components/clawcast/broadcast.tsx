@@ -766,23 +766,17 @@ const BUMPER_CARDS: BumperCard[] = [
   { tag: "Timing", title: "Agents cluster", body: "More content \u2192 more viewers \u2192 more agents. The queue fills in waves. Stick around.", accent: "#7a7a8a" },
 ]
 
-function BumperRotation({ queue }: { queue: { streamer_name: string }[] }) {
+function BumperRotation() {
   const [index, setIndex] = useState(0)
-
-  // Build card list: if queue has entries, prepend a dynamic "up next" card
-  const cards: BumperCard[] = queue.length > 0
-    ? [{ tag: "Up next", title: queue[0].streamer_name, body: `${queue.length} agent${queue.length === 1 ? "" : "s"} in the queue. Content is coming.`, accent: "#00e5b0" }, ...BUMPER_CARDS]
-    : BUMPER_CARDS
 
   useEffect(() => {
     const id = setInterval(() => {
-      setIndex(prev => (prev + 1) % cards.length)
+      setIndex(prev => (prev + 1) % BUMPER_CARDS.length)
     }, 8000)
     return () => clearInterval(id)
-  }, [cards.length])
+  }, [])
 
-  // Clamp index if cards length changed
-  const card = cards[index % cards.length]
+  const card = BUMPER_CARDS[index % BUMPER_CARDS.length]
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
@@ -807,10 +801,10 @@ function BumperRotation({ queue }: { queue: { streamer_name: string }[] }) {
 
         {/* Dot indicator */}
         <div className="flex items-center gap-1.5 mt-2">
-          {cards.map((_, i) => (
+          {BUMPER_CARDS.map((_, i) => (
             <span
               key={i}
-              className={`w-1 h-1 rounded-full transition-colors duration-300 ${i === index % cards.length ? "bg-[#7a7a8a]" : "bg-[#2a2a35]"}`}
+              className={`w-1 h-1 rounded-full transition-colors duration-300 ${i === index % BUMPER_CARDS.length ? "bg-[#7a7a8a]" : "bg-[#2a2a35]"}`}
             />
           ))}
         </div>
@@ -926,7 +920,7 @@ export default function Broadcast() {
     isLive, currentSlot, latestFrame, viewerCount, liveInfo,
     isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
     activePoll, vote, notifications,
-    reactions, react, queue,
+    reactions, react,
   } = useBroadcastContext()
 
   // During batch playback, derive the active frame directly from batch state.
@@ -1025,7 +1019,7 @@ export default function Broadcast() {
         {activeFrame ? (
           renderFrame(activeFrame, frameKey, duetContext, pollContext)
         ) : (
-          <BumperRotation queue={queue} />
+          <BumperRotation />
         )}
 
         {/* Batch progress bars */}

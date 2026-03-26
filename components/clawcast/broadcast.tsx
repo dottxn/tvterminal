@@ -6,13 +6,12 @@ import DOMPurify from "isomorphic-dompurify"
 import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction, HistoryCard } from "@/hooks/use-broadcast"
 import { ALLOWED_REACTION_EMOJI, FRAME_SIZES, type FrameSize } from "@/lib/types"
 
-// Desktop width classes per frame size (narrower cards centered, Porto Rocha style)
-// Mobile: full-width. Desktop (lg+): variable max-widths.
+// Desktop width classes per frame size — cards float centered in snap panels
 const FRAME_SIZE_WIDTH: Record<FrameSize, string> = {
-  landscape: "w-full lg:max-w-[640px]",
-  square: "w-full lg:max-w-[480px]",
-  portrait: "w-full lg:max-w-[420px]",
-  tall: "w-full lg:max-w-[360px]",
+  landscape: "w-full lg:max-w-[720px]",
+  square: "w-full lg:max-w-[520px]",
+  portrait: "w-full lg:max-w-[460px]",
+  tall: "w-full lg:max-w-[380px]",
 }
 
 // ── Hex color validation ──
@@ -1028,6 +1027,20 @@ function OnboardingCard() {
   )
 }
 
+// ── Snap Panel ──
+// Wraps each card in a full-viewport-height panel for snap-scroll.
+
+function SnapPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0 px-4 lg:px-8"
+      style={{ scrollSnapAlign: "start" }}
+    >
+      {children}
+    </div>
+  )
+}
+
 // ── Feed Card ──
 // A single card in the feed — wraps a live or completed broadcast.
 
@@ -1039,7 +1052,6 @@ function FeedCard({
   isLive,
   streamerName,
   slideType,
-  viewerCount,
   liveInfo,
   isBatchPlaying,
   batchSlides,
@@ -1055,7 +1067,6 @@ function FeedCard({
   isLive: boolean
   streamerName: string | null
   slideType: string | null
-  viewerCount: number
   liveInfo: { streamer_name: string; seconds_remaining: number } | null
   isBatchPlaying: boolean
   batchSlides: BatchSlide[]
@@ -1073,34 +1084,33 @@ function FeedCard({
 
       {/* Card header — minimal */}
       <div className="flex items-center gap-3 px-1 py-3">
-        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${
-          isLive ? "live-pulse bg-[#e91916]" : "bg-[#2a2a35]"
+        <span className={`w-[6px] h-[6px] rounded-full shrink-0 ${
+          isLive ? "live-pulse bg-[#e91916]" : "bg-[#d0d0d0]"
         }`} />
         {streamerName ? (
-          <span className="text-[12px] font-mono text-[#7a7a8a]">
+          <span className="text-[12px] font-sans text-[#999999]">
             {streamerName}
           </span>
         ) : (
-          <span className="text-[12px] font-mono text-[#2a2a35]">—</span>
+          <span className="text-[12px] font-sans text-[#d0d0d0]">—</span>
         )}
         {slideType && slideType !== "text" && (
-          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#53535f]">
+          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">
             {slideType}
           </span>
         )}
         <div className="ml-auto flex items-center gap-3">
           {liveInfo && (
-            <span className="text-[11px] font-mono text-[#53535f] tabular-nums">
+            <span className="text-[11px] font-sans text-[#bbbbbb] tabular-nums">
               {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")}
             </span>
           )}
-          <span className="text-[11px] font-mono text-[#2a2a35] tabular-nums">{viewerCount}</span>
         </div>
       </div>
 
       {/* Card viewport — variable aspect ratio based on frame size */}
       <div
-        className="relative w-full overflow-hidden transition-colors duration-300"
+        className="relative w-full overflow-hidden"
         style={{
           aspectRatio,
           backgroundColor: viewportBg || "#0e0e10",
@@ -1140,7 +1150,7 @@ function FeedCard({
             <button
               key={emoji}
               onClick={() => onReact(emoji)}
-              className="w-8 h-8 flex items-center justify-center text-[16px] hover:bg-[#1a1a1f] active:scale-90 transition-all duration-150 cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center text-[16px] hover:bg-[#f0f0f0] rounded active:scale-90 transition-all duration-150 cursor-pointer"
               aria-label={`React with ${emoji}`}
             >
               {emoji}
@@ -1324,16 +1334,16 @@ function HistoryFeedCard({ card }: { card: HistoryCard }) {
   const timeAgo = formatTimeAgo(card.completedAt)
 
   return (
-    <div className={`w-full ${maxWidth} mx-auto opacity-70 hover:opacity-90 transition-opacity duration-200`}>
+    <div className={`w-full ${maxWidth} mx-auto opacity-60 hover:opacity-90 transition-opacity duration-200`}>
       {/* Card header */}
       <div className="flex items-center gap-3 px-1 py-3">
-        <span className="w-[7px] h-[7px] rounded-full shrink-0 bg-[#2a2a35]" />
-        <span className="text-[12px] font-mono text-[#53535f]">{card.streamerName}</span>
+        <span className="w-[6px] h-[6px] rounded-full shrink-0 bg-[#d0d0d0]" />
+        <span className="text-[12px] font-sans text-[#999999]">{card.streamerName}</span>
         {slideType && slideType !== "text" && (
-          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#3a3a45]">{slideType}</span>
+          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">{slideType}</span>
         )}
         <div className="ml-auto">
-          <span className="text-[10px] font-mono text-[#3a3a45]">{timeAgo}</span>
+          <span className="text-[10px] font-sans text-[#bbbbbb]">{timeAgo}</span>
         </div>
       </div>
 
@@ -1379,39 +1389,11 @@ function BackToLivePill({ onClick, visible }: { onClick: () => void; visible: bo
   return (
     <button
       onClick={onClick}
-      className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#e91916] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] shadow-lg pill-enter"
+      className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] rounded-full shadow-lg pill-enter"
       aria-label="Back to live"
     >
-      <span className="w-2 h-2 rounded-full bg-white live-pulse" />
+      <span className="w-2 h-2 rounded-full bg-[#e91916] live-pulse" />
       Live
-    </button>
-  )
-}
-
-// ── Now Playing Mini-bar ──
-// Thin bar at top of feed when user has scrolled away from live content
-
-function NowPlayingBar({ streamerName, liveInfo, onClick, visible }: {
-  streamerName: string
-  liveInfo: { seconds_remaining: number } | null
-  onClick: () => void
-  visible: boolean
-}) {
-  if (!visible) return null
-  return (
-    <button
-      onClick={onClick}
-      className="sticky top-0 z-20 w-full flex items-center gap-3 px-4 py-2 bg-[#18181b]/95 backdrop-blur-sm border-b border-[#2a2a35] cursor-pointer hover:bg-[#1f1f23] transition-colors"
-      aria-label="Scroll to live content"
-    >
-      <span className="w-2 h-2 rounded-full bg-[#e91916] live-pulse shrink-0" />
-      <span className="text-[12px] font-mono text-[#efeff1]">{streamerName}</span>
-      {liveInfo && (
-        <span className="text-[11px] font-mono text-[#53535f] tabular-nums">
-          {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")}
-        </span>
-      )}
-      <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.1em] text-[#7a7a8a]">↑ now playing</span>
     </button>
   )
 }
@@ -1464,14 +1446,16 @@ export default function Broadcast() {
 
   const currentFrameSize: FrameSize = (currentSlot?.frame_size as FrameSize) || "landscape"
 
-  // Scroll tracking
+  // Snap-scroll tracking — detect which panel the user is on
   useEffect(() => {
     const feedEl = feedRef.current
     if (!feedEl) return
 
     function handleScroll() {
       const scrollTop = feedEl!.scrollTop
-      const scrolled = scrollTop > 100
+      const panelHeight = feedEl!.clientHeight
+      // User is "scrolled away from live" if they've scrolled past half a panel
+      const scrolled = scrollTop > panelHeight * 0.5
       isUserScrolledRef.current = scrolled
       setIsUserScrolled(scrolled)
       setShowLivePill(scrolled && isLive)
@@ -1487,7 +1471,7 @@ export default function Broadcast() {
     else if (isUserScrolledRef.current) setShowLivePill(true)
   }, [isLive, isUserScrolledRef])
 
-  // Auto-scroll to top when new slot starts (only if user is near top)
+  // Auto-scroll to top when new slot starts (snap to first panel)
   const prevIsLiveRef = useRef(isLive)
   useEffect(() => {
     if (isLive && !prevIsLiveRef.current && !isUserScrolledRef.current) {
@@ -1501,52 +1485,45 @@ export default function Broadcast() {
     setShowLivePill(false)
   }
 
-  const showNowPlaying = showLivePill && !!streamerName
-
   return (
-    <div ref={feedRef} className="relative flex flex-col flex-1 min-w-0 overflow-y-auto scroll-smooth">
+    <div
+      ref={feedRef}
+      className="relative flex-1 min-w-0 overflow-y-scroll"
+      style={{ scrollSnapType: "y mandatory" }}
+    >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
-      {/* Now Playing mini-bar — sticky at top when scrolled away from live */}
-      <NowPlayingBar
-        streamerName={streamerName || ""}
-        liveInfo={liveInfo}
-        onClick={scrollToLive}
-        visible={showNowPlaying}
-      />
+      {/* Live card — first snap panel */}
+      <SnapPanel>
+        <FeedCard
+          activeFrame={activeFrame}
+          frameKey={frameKey}
+          duetContext={duetContext}
+          pollContext={pollContext}
+          isLive={isLive}
+          streamerName={streamerName}
+          slideType={slideType}
+          liveInfo={liveInfo}
+          isBatchPlaying={isBatchPlaying}
+          batchSlides={batchSlides}
+          batchIndex={batchIndex}
+          reactions={reactions}
+          react={react}
+          frameSize={currentFrameSize}
+        />
+      </SnapPanel>
 
-      <div className="flex flex-col items-center w-full py-6 px-4 gap-8 min-h-full">
+      {/* History cards — one per snap panel */}
+      {feedHistory.map((card) => (
+        <SnapPanel key={card.slotId}>
+          <HistoryFeedCard card={card} />
+        </SnapPanel>
+      ))}
 
-        {/* Live card or bumper */}
-        <div className="card-enter w-full flex justify-center">
-          <FeedCard
-            activeFrame={activeFrame}
-            frameKey={frameKey}
-            duetContext={duetContext}
-            pollContext={pollContext}
-            isLive={isLive}
-            streamerName={streamerName}
-            slideType={slideType}
-            viewerCount={viewerCount}
-            liveInfo={liveInfo}
-            isBatchPlaying={isBatchPlaying}
-            batchSlides={batchSlides}
-            batchIndex={batchIndex}
-            reactions={reactions}
-            react={react}
-            frameSize={currentFrameSize}
-          />
-        </div>
-
-        {/* History cards */}
-        {feedHistory.map((card) => (
-          <HistoryFeedCard key={card.slotId} card={card} />
-        ))}
-
-        {/* Onboarding card — always at bottom, hero when idle */}
+      {/* Onboarding card — always at bottom */}
+      <SnapPanel>
         <OnboardingCard />
-
-      </div>
+      </SnapPanel>
     </div>
   )
 }

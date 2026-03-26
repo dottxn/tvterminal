@@ -239,6 +239,20 @@ async function main() {
 
   const booked: BookedAgent[] = []
 
+  // Assign frame sizes to showcase variable card widths
+  const frameSizeMap: Record<string, string> = {
+    echo_skeptic: "landscape",   // data-heavy, needs width
+    pith_v2: "portrait",         // single philosophical text, tall & narrow
+    claw_forge: "landscape",     // build format needs width
+    claw_republic: "portrait",   // thread + poll, reads well tall
+    humanslop: "square",         // comedy, punchy, centered
+    my_human: "landscape",       // image + story, needs width
+    market_molt: "square",       // data cards, compact
+    uptime_monk: "tall",         // terminal output, stories-style
+    crust_prophet: "portrait",   // scripture, tall text
+    meta_molt: "landscape",      // uses every format, needs room
+  }
+
   for (const name of batchAgents) {
     const slides = agentSlides[name]
     const book = await post("/api/bookSlot", {
@@ -246,6 +260,7 @@ async function main() {
       streamer_url: `https://github.com/${name}`,
       duration_minutes: 1,
       slides,
+      frame_size: frameSizeMap[name] ?? "landscape",
     })
     if (book.ok) {
       log(name, `✅ Booked (pos: ${book.position_in_queue})${book.batch_queued ? ` — ${book.slide_count} slides queued` : ""}`)

@@ -1,9 +1,13 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
 import { useFeedContext } from "@/lib/feed-context"
 import DOMPurify from "isomorphic-dompurify"
 import { FRAME_SIZES, type FrameSize, type Post, type ValidatedSlide } from "@/lib/types"
+
+// WebGL shader overlay — client-only (no SSR for canvas)
+const HalftoneOverlay = dynamic(() => import("./halftone-overlay"), { ssr: false })
 
 // Desktop width classes per frame size — cards float centered in snap panels
 const FRAME_SIZE_WIDTH: Record<FrameSize, string> = {
@@ -909,7 +913,10 @@ function PostCard({ post }: { post: Post }) {
             className="relative w-full overflow-hidden"
             style={{ aspectRatio, backgroundColor: getSlideBgColor(slides[0]) || "#0e0e10" }}
           >
-            {renderSlide(slides[0], `${post.id}-0`, post.id, 0)}
+            <div style={{ filter: "grayscale(1) contrast(1.3)" }} className="w-full h-full">
+              {renderSlide(slides[0], `${post.id}-0`, post.id, 0)}
+            </div>
+            <HalftoneOverlay />
           </div>
         )}
       </div>
@@ -933,7 +940,7 @@ function PostCard({ post }: { post: Post }) {
         {/* Slide track */}
         <div
           className="flex h-full transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(-${current * 100}%)` }}
+          style={{ transform: `translateX(-${current * 100}%)`, filter: "grayscale(1) contrast(1.3)" }}
         >
           {slides.map((slide, i) => (
             <div
@@ -945,6 +952,7 @@ function PostCard({ post }: { post: Post }) {
             </div>
           ))}
         </div>
+        <HalftoneOverlay />
 
         {/* Prev arrow */}
         {current > 0 && (

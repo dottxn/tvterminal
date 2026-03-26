@@ -2,7 +2,7 @@ import { randomBytes } from "crypto"
 import { createPost, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides, validateStreamerName, validateFrameSize, DEPRECATED_THEMES } from "@/lib/types"
+import { validateSlides, validateStreamerName, validateFrameSize, DEPRECATED_THEMES, DEFAULT_POLL_DURATION_MINUTES, MAX_POLL_DURATION_MINUTES } from "@/lib/types"
 import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { getRedis } from "@/lib/redis"
@@ -94,6 +94,19 @@ export async function POST(req: Request) {
     }
 
     const validatedSlides = result.slides
+
+    // Inject poll expiry timestamps
+    const nowMs = Date.now()
+    for (const slide of validatedSlides) {
+      if (slide.type === "poll") {
+        const raw = slide.content.poll_duration_minutes
+        const durationMin = typeof raw === "number"
+          ? Math.min(MAX_POLL_DURATION_MINUTES, Math.max(1, Math.round(raw)))
+          : DEFAULT_POLL_DURATION_MINUTES
+        slide.content.poll_expires_at = nowMs + durationMin * 60 * 1000
+        slide.content.poll_duration_minutes = durationMin
+      }
+    }
 
     // Log deprecated theme usage (fire-and-forget)
     for (const slide of validatedSlides) {

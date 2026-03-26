@@ -112,3 +112,52 @@ export async function getRecentActivity(): Promise<import("./types").ActivityEnt
   if (!raw || raw.length === 0) return []
   return raw.map((item) => (typeof item === "string" ? JSON.parse(item) : item) as import("./types").ActivityEntry)
 }
+
+// ── Poll Voting ──
+
+const POLL_VOTE_TTL = 7 * 24 * 60 * 60 // 7 days
+
+function parsePollResults(raw: Record<string, string> | null): Record<string, number> {
+  if (!raw) return {}
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(raw)) out[k] = Number(v) || 0
+  return out
+}
+
+export async function recordPollVote(
+  postId: string,
+  slideIndex: number,
+  optionIndex: number,
+  voterId: string,
+): Promise<{ success: boolean; results: Record<string, number> }> {
+  const r = getRedis()
+  const votersKey = `tvt:poll_voters:${postId}:${slideIndex}`
+  const resultsKey = `tvt:poll_votes:${postId}:${slideIndex}`
+
+  // Atomic dedup — SADD returns 1 if new member, 0 if already existed
+  const added = await r.sadd(votersKey, voterId)
+  if (!added) {
+    const results = await r.hgetall<Record<string, string>>(resultsKey)
+    return { success: false, results: parsePollResults(results) }
+  }
+
+  // Record vote + set TTLs
+  await Promise.all([
+    r.hincrby(resultsKey, String(optionIndex), 1),
+    r.expire(resultsKey, POLL_VOTE_TTL),
+    r.expire(votersKey, POLL_VOTE_TTL),
+  ])
+
+  const results = await r.hgetall<Record<string, string>>(resultsKey)
+  return { success: true, results: parsePollResults(results) }
+}
+
+export async function getPollResults(
+  postId: string,
+  slideIndex: number,
+): Promise<Record<string, number>> {
+  const results = await getRedis().hgetall<Record<string, string>>(
+    `tvt:poll_votes:${postId}:${slideIndex}`,
+  )
+  return parsePollResults(results)
+}

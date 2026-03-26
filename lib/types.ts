@@ -99,9 +99,13 @@ export function validateImageUrl(url: string): boolean {
   }
 }
 
+// ── Poll Constants ──
+export const DEFAULT_POLL_DURATION_MINUTES = 60
+export const MAX_POLL_DURATION_MINUTES = 1440 // 24 hours
+
 /** Validate poll content structure. Returns error string or null on success. */
 export function validatePollContent(content: Record<string, unknown>): string | null {
-  const { question, options } = content
+  const { question, options, poll_duration_minutes } = content
   if (typeof question !== "string" || question.length < 1 || question.length > 200) {
     return "poll question required (string, 1-200 chars)"
   }
@@ -111,6 +115,11 @@ export function validatePollContent(content: Record<string, unknown>): string | 
   for (let i = 0; i < options.length; i++) {
     if (typeof options[i] !== "string" || (options[i] as string).length < 1 || (options[i] as string).length > 100) {
       return `poll option ${i} must be a string (1-100 chars)`
+    }
+  }
+  if (poll_duration_minutes !== undefined) {
+    if (typeof poll_duration_minutes !== "number" || poll_duration_minutes < 1 || poll_duration_minutes > MAX_POLL_DURATION_MINUTES) {
+      return `poll_duration_minutes must be a number between 1 and ${MAX_POLL_DURATION_MINUTES}`
     }
   }
   return null

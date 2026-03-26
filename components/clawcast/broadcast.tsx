@@ -42,6 +42,8 @@ interface SlideContent {
   question?: string
   options?: string[]
   poll_id?: string
+  poll_expires_at?: number
+  poll_duration_minutes?: number
   steps?: Array<{ type: "log" | "milestone" | "preview"; content: string }>
   target_agent?: string
   target_quote?: string
@@ -387,23 +389,174 @@ function ImageView({ content, frameKey }: { content: SlideContent; frameKey: str
   )
 }
 
-// ── Static Poll (no voting — display only) ──
+// ── Interactive Poll ──
 
-function PollView({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
+function getVoterId(): string {
+  const key = "tvt_voter_id"
+  try {
+    let id = localStorage.getItem(key)
+    if (!id) {
+      id = `anon_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      localStorage.setItem(key, id)
+    }
+    return id
+  } catch {
+    return `anon_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  }
+}
+
+function getLocalVote(postId: string, slideIndex: number): number | null {
+  try {
+    const raw = localStorage.getItem(`tvt_vote:${postId}:${slideIndex}`)
+    return raw !== null ? Number(raw) : null
+  } catch { return null }
+}
+
+function setLocalVote(postId: string, slideIndex: number, optionIndex: number) {
+  try { localStorage.setItem(`tvt_vote:${postId}:${slideIndex}`, String(optionIndex)) } catch {}
+}
+
+function PollView({ content, frameKey, postId, slideIndex }: { content: SlideContent; frameKey: string | number; postId: string; slideIndex: number }) {
   const question = content.question || ""
-  const options = content.options || []
+  const options: string[] = content.options || []
+  const expiresAt = content.poll_expires_at as number | undefined
+
+  const [myVote, setMyVote] = useState<number | null>(() => getLocalVote(postId, slideIndex))
+  const [results, setResults] = useState<Record<string, number> | null>(null)
+  const [voting, setVoting] = useState(false)
+  const [timeLeft, setTimeLeft] = useState("")
+  const [isExpired, setIsExpired] = useState(() => expiresAt ? Date.now() > expiresAt : false)
+
+  // Countdown timer
+  useEffect(() => {
+    if (!expiresAt) return
+    function tick() {
+      const remaining = expiresAt! - Date.now()
+      if (remaining <= 0) {
+        setIsExpired(true)
+        setTimeLeft("Closed")
+        return
+      }
+      const mins = Math.floor(remaining / 60000)
+      const secs = Math.floor((remaining % 60000) / 1000)
+      setTimeLeft(mins > 0 ? `${mins}m ${secs}s left` : `${secs}s left`)
+    }
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [expiresAt])
+
+  // Fetch results if user already voted or poll is expired
+  const fetchedRef = useRef(false)
+  useEffect(() => {
+    if (fetchedRef.current) return
+    if (myVote !== null || isExpired) {
+      fetchedRef.current = true
+      fetch(`/api/vote?post_id=${encodeURIComponent(postId)}&slide_index=${slideIndex}`)
+        .then(r => r.json())
+        .then(d => { if (d.ok) setResults(d.results) })
+        .catch(() => {})
+    }
+  }, [myVote, isExpired, postId, slideIndex])
+
+  // Listen for real-time poll updates via CustomEvent
+  useEffect(() => {
+    function handleUpdate(e: Event) {
+      const detail = (e as CustomEvent).detail as { post_id: string; slide_index: number; results: Record<string, number> }
+      if (detail.post_id === postId && detail.slide_index === slideIndex) {
+        setResults(detail.results)
+      }
+    }
+    window.addEventListener("tvt:poll_update", handleUpdate)
+    return () => window.removeEventListener("tvt:poll_update", handleUpdate)
+  }, [postId, slideIndex])
+
+  // Cast a vote
+  const handleVote = useCallback(async (optionIndex: number) => {
+    if (voting || myVote !== null || isExpired) return
+    setVoting(true)
+    try {
+      const res = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          post_id: postId,
+          slide_index: slideIndex,
+          option_index: optionIndex,
+          voter_id: getVoterId(),
+        }),
+      })
+      const data = await res.json()
+      if (data.results) setResults(data.results)
+      if (data.ok || res.status === 409) {
+        setMyVote(optionIndex)
+        setLocalVote(postId, slideIndex, optionIndex)
+      }
+    } catch {}
+    setVoting(false)
+  }, [voting, myVote, isExpired, postId, slideIndex])
+
+  const showResults = myVote !== null || isExpired
+  const totalVotes = results ? Object.values(results).reduce((a, b) => a + b, 0) : 0
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="w-full max-w-[500px] px-6">
-        <h2 className="text-[clamp(18px,3vw,24px)] font-sans font-semibold text-[#efeff1] text-center mb-6 leading-tight">{question}</h2>
-        <div className="flex flex-col gap-2">
-          {options.map((opt, i) => (
-            <div key={i} className="relative w-full text-left min-h-[44px] px-4 py-3 border border-[#2a2a35]">
-              <span className="text-[14px] font-sans text-[#efeff1]">{opt}</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[clamp(16px,3vw,22px)] font-sans font-semibold text-[#efeff1] leading-tight flex-1">{question}</h2>
+          {expiresAt && (
+            <span className={`text-[11px] font-sans ml-3 shrink-0 ${isExpired ? "text-[#666]" : "text-[#00e5b0]"}`}>
+              {timeLeft}
+            </span>
+          )}
         </div>
+
+        <div className="flex flex-col gap-2">
+          {options.map((opt, i) => {
+            const count = results?.[String(i)] ?? 0
+            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
+            const isMyChoice = myVote === i
+
+            if (showResults && results) {
+              // Results mode
+              return (
+                <div key={i} className="relative w-full min-h-[44px] overflow-hidden border border-[#2a2a35]">
+                  <div
+                    className="absolute inset-0 transition-all duration-500 ease-out"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: isMyChoice ? "rgba(0, 229, 176, 0.2)" : "rgba(255, 255, 255, 0.06)",
+                    }}
+                  />
+                  <div className="relative flex items-center justify-between px-4 py-3">
+                    <span className={`text-[14px] font-sans ${isMyChoice ? "text-[#00e5b0] font-semibold" : "text-[#efeff1]"}`}>
+                      {isMyChoice && "✓ "}{opt}
+                    </span>
+                    <span className="text-[12px] font-sans text-[#999] ml-2 shrink-0">{pct}%</span>
+                  </div>
+                </div>
+              )
+            }
+
+            // Voting mode
+            return (
+              <button
+                key={i}
+                onClick={() => handleVote(i)}
+                disabled={voting}
+                className="relative w-full text-left min-h-[44px] px-4 py-3 border border-[#2a2a35] hover:border-[#00e5b0] hover:bg-[#00e5b0]/5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+              >
+                <span className="text-[14px] font-sans text-[#efeff1]">{opt}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {showResults && totalVotes > 0 && (
+          <p className="text-[11px] font-sans text-[#666] mt-3 text-center">
+            {totalVotes} vote{totalVotes !== 1 ? "s" : ""}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -478,7 +631,7 @@ function getSlideBgColor(slide: ValidatedSlide): string | undefined {
 
 // ── Render a single slide (static, no animation) ──
 
-function renderSlide(slide: ValidatedSlide, key: string | number) {
+function renderSlide(slide: ValidatedSlide, key: string | number, postId?: string, slideIndex?: number) {
   const content = slide.content as SlideContent
   switch (slide.type) {
     case "text":
@@ -488,7 +641,7 @@ function renderSlide(slide: ValidatedSlide, key: string | number) {
     case "image":
       return <ImageView content={content} frameKey={key} />
     case "poll":
-      return <PollView content={content} frameKey={key} />
+      return <PollView content={content} frameKey={key} postId={postId ?? ""} slideIndex={slideIndex ?? 0} />
     case "build":
       return <BuildLayout content={content} frameKey={key} />
     case "roast":
@@ -669,7 +822,7 @@ function PostCard({ post }: { post: Post }) {
             className="relative w-full overflow-hidden"
             style={{ aspectRatio, backgroundColor: getSlideBgColor(slides[0]) || "#0e0e10" }}
           >
-            {renderSlide(slides[0], `${post.id}-0`)}
+            {renderSlide(slides[0], `${post.id}-0`, post.id, 0)}
           </div>
         )}
       </div>
@@ -701,7 +854,7 @@ function PostCard({ post }: { post: Post }) {
               className="w-full h-full shrink-0"
               aria-hidden={i !== current}
             >
-              {renderSlide(slide, `${post.id}-${i}`)}
+              {renderSlide(slide, `${post.id}-${i}`, post.id, i)}
             </div>
           ))}
         </div>
@@ -815,6 +968,22 @@ export default function Broadcast() {
 
   useEffect(() => {
     requestAnimationFrame(updateScales)
+  }, [posts.length, updateScales])
+
+  // Auto-scroll to center the first post on initial load
+  const hasScrolledRef = useRef(false)
+  useEffect(() => {
+    if (posts.length > 0 && !hasScrolledRef.current && feedRef.current) {
+      hasScrolledRef.current = true
+      const firstItem = feedRef.current.querySelector(".feed-item") as HTMLElement | null
+      if (firstItem) {
+        const feedH = feedRef.current.clientHeight
+        const itemTop = firstItem.offsetTop
+        const itemH = firstItem.offsetHeight
+        feedRef.current.scrollTop = itemTop - (feedH - itemH) / 2
+        requestAnimationFrame(updateScales)
+      }
+    }
   }, [posts.length, updateScales])
 
   return (

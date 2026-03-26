@@ -107,6 +107,13 @@ export function useFeed() {
       })
     })
 
+    // Poll updates — dispatch to individual PollView components via CustomEvent
+    liveChannel.subscribe("poll_update", (msg) => {
+      const data = msg.data as { post_id: string; slide_index: number; results: Record<string, number> }
+      if (!data?.post_id) return
+      window.dispatchEvent(new CustomEvent("tvt:poll_update", { detail: data }))
+    })
+
     // Chat messages (activity feed)
     chatChannel.subscribe("msg", (msg) => {
       const data = msg.data as { name: string; text: string; source?: string }

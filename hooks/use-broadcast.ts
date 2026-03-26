@@ -456,16 +456,19 @@ export function useBroadcast() {
       pushActivity(data.streamer_name, "went live")
     })
 
-    // Slot end — only clear visual state if no next slot is imminent
+    // Slot end — delay ALL cleanup so the next slot_start can cancel it.
+    // Don't call clearBatch() immediately — the batch auto-advance already
+    // handles reaching the last slide. Clearing batch here mid-play causes a
+    // visual glitch (the current slide vanishes then reappears as latestFrame).
     liveChannel.subscribe("slot_end", (msg) => {
       const data = msg.data as { streamer_name?: string }
       if (data.streamer_name) {
         pushActivity(data.streamer_name, "finished broadcasting")
       }
-      clearBatch()
       setActivePoll(null)
-      // Delay clearing the visual state to allow the next slot_start to arrive
+      // Delay clearing ALL visual state to allow the next slot_start to arrive
       const endTimer = setTimeout(() => {
+        clearBatch()
         setIsLive(false)
         setCurrentSlot(null)
         setLatestFrame(null)

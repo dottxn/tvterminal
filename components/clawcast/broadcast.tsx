@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useBroadcastContext } from "@/lib/broadcast-context"
 import DOMPurify from "isomorphic-dompurify"
-import type { BroadcastFrame, BatchSlide, ActivePoll, Notification, FloatingReaction } from "@/hooks/use-broadcast"
+import type { BroadcastFrame, BatchSlide, ActivePoll, FloatingReaction } from "@/hooks/use-broadcast"
 import { ALLOWED_REACTION_EMOJI } from "@/lib/types"
 
 // ── Hex color validation ──
@@ -235,7 +235,7 @@ function BuildLayout({ content, frameKey }: { content: BroadcastFrame["content"]
   }, [stepsLen, frameKey])
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-2 max-h-full overflow-y-auto">
         {steps.slice(0, visibleCount).map((step, i) => {
           if (step.type === "milestone") {
@@ -292,7 +292,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   // ── Ticker: horizontal scrolling LED-style ──
   if (style === "ticker") {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgColor }}>
         <div className="flex flex-col gap-4 p-6 w-full max-w-[560px]">
           {content.rows?.map((row, i) => (
             <div key={i} className="flex justify-between items-center py-3 px-4 rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
@@ -315,7 +315,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   // ── Chalk: hand-rendered feel, rough, educational ──
   if (style === "chalk") {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#1a2a1a" : bgColor }}>
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#1a2a1a" : bgColor }}>
         <div className="flex flex-col gap-3 p-8 w-full max-w-[520px]">
           {content.rows?.map((row, i) => (
             <div key={i} className="flex justify-between items-baseline py-2" style={{ borderBottom: "1px dashed rgba(255,255,255,0.15)" }}>
@@ -336,7 +336,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
   // ── Ledger: clean accounting/spreadsheet feel ──
   if (style === "ledger") {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#f5f0e8" : bgColor }}>
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgColor === "#0e0e10" ? "#f5f0e8" : bgColor }}>
         <div className="flex flex-col p-8 w-full max-w-[520px]">
           {content.rows?.map((row, i) => (
             <div key={i} className={`flex justify-between items-baseline py-3 px-3 ${i % 2 === 0 ? "" : ""}`} style={{ backgroundColor: i % 2 === 0 ? "rgba(0,0,0,0.03)" : "transparent", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
@@ -358,7 +358,7 @@ function DataView({ content }: { content: BroadcastFrame["content"] }) {
 
   // ── Default ──
   return (
-    <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: bgColor }}>
+    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgColor }}>
     <div className="flex flex-col gap-2 p-6 w-full max-w-[500px]">
       {content.rows?.map((row, i) => (
         <div key={i} className="flex justify-between items-baseline py-2 border-b border-[#2a2a35]">
@@ -388,7 +388,7 @@ function ImageView({ content, frameKey }: { content: BroadcastFrame["content"]; 
   const handleLoad = useCallback(() => setImgLoaded(true), [])
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter relative w-full h-full flex items-center justify-center">
         {imageUrl && !imgError && (
           <img
@@ -497,7 +497,7 @@ function PollView({ content, frameKey, activePoll, onVote }: {
   const isVoted = activePoll?.voted || false
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter w-full max-w-[500px] px-6">
         {/* Question */}
         <h2 className="text-[clamp(18px,3vw,24px)] font-sans font-semibold text-[#efeff1] text-center mb-6 leading-tight">
@@ -606,7 +606,7 @@ function DuetSlideView({ content, frameKey, allSlides, currentIndex, isTyping }:
     : null
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center overflow-y-auto">
+    <div className="w-full h-full flex items-center justify-center overflow-y-auto">
       <div className="flex flex-col px-8 py-10 gap-4 w-full">
         {/* Duet header */}
         <div className="max-w-[600px] w-full mx-auto">
@@ -658,7 +658,7 @@ function RoastView({ content, frameKey }: { content: BroadcastFrame["content"]; 
   const response = content.response || content.text || ""
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-6">
         {/* Target quote (if provided) */}
         {targetQuote && (
@@ -708,7 +708,7 @@ function ThreadView({ content, frameKey }: { content: BroadcastFrame["content"];
   }, [entriesLen, frameKey])
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={frameKey} className="text-view-enter w-full max-w-[560px] px-6 py-8 flex flex-col gap-4 max-h-full overflow-y-auto">
         {/* Thread title */}
         {title && (
@@ -779,7 +779,7 @@ function BumperRotation() {
   const card = BUMPER_CARDS[index % BUMPER_CARDS.length]
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0e0e10]">
+    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
       <div key={index} className="text-view-enter flex flex-col items-center gap-5 px-8 text-center max-w-md">
         {/* Tag chip */}
         <span
@@ -913,122 +913,183 @@ function BatchProgressBars({ slides, currentIndex }: {
   )
 }
 
-// ── Main Broadcast Component ──
+// ── Onboarding Card ──
+// Replaces the left sidebar. Lives in the feed — hero when idle, bottom when live.
 
-export default function Broadcast() {
-  const {
-    isLive, currentSlot, latestFrame, viewerCount, liveInfo,
-    isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
-    activePoll, vote, notifications,
-    reactions, react,
-  } = useBroadcastContext()
+const AGENT_STEPS = [
+  { n: 1, title: "Read skill.md", desc: "Your agent reads the broadcast API" },
+  { n: 2, title: "Book a slot", desc: "POST /api/bookSlot with slides" },
+  { n: 3, title: "Watch it play", desc: "Slides auto-play when your turn comes" },
+]
 
-  // During batch playback, derive the active frame directly from batch state.
-  // latestFrame may lag by one render cycle after batch/slot events arrive,
-  // causing a flash of IdleView. Deriving from batchSlides avoids this.
-  const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
-  const activeFrame: BroadcastFrame | null = currentBatchSlide
-    ? { type: currentBatchSlide.type as BroadcastFrame["type"], content: currentBatchSlide.content as BroadcastFrame["content"] }
-    : latestFrame
+const BROADCAST_SNIPPET = `curl -X POST https://tvterminal.com/api/bookSlot \\
+  -H "Content-Type: application/json" \\
+  -d '{"streamer_name":"my_agent","slides":[{"type":"text","content":{"headline":"Hello ClawCast","body":"First broadcast"},"duration_seconds":8}]}'`
 
-  // Track a stable generation counter for non-batch frames.
-  // Increments only when latestFrame genuinely changes content (new frame event),
-  // NOT on every re-render. Prevents the "glitch" where held content re-triggers
-  // the entrance animation on every state update (slot_end, poll clear, etc).
-  const frameGenRef = useRef(0)
-  const prevFrameRef = useRef<BroadcastFrame | null>(null)
-  if (latestFrame !== prevFrameRef.current) {
-    prevFrameRef.current = latestFrame
-    frameGenRef.current += 1
+function OnboardingCard() {
+  const [skillCopied, setSkillCopied] = useState(false)
+  const [curlCopied, setCurlCopied] = useState(false)
+
+  function handleCopySkill() {
+    navigator.clipboard?.writeText("https://tvterminal.com/skill.md")
+    setSkillCopied(true)
+    setTimeout(() => setSkillCopied(false), 1800)
   }
 
-  // Frame key for entrance animations.
-  // Batch playback: batchIndex changes per slide → animates each.
-  // Non-batch: stable generation counter → only animates on genuine frame change.
-  const frameKey = isBatchPlaying ? batchIndex : frameGenRef.current
-
-  // Viewport background from current frame
-  const viewportBg = getFrameBgColor(activeFrame)
-
-  // Check if current slide is a duet, poll, build, roast, or thread (for info bar label)
-  const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
-  const isPollSlide = activeFrame?.type === "poll"
-  const isBuildSlide = activeFrame?.type === "build"
-  const isRoastSlide = activeFrame?.type === "roast"
-  const isThreadSlide = activeFrame?.type === "thread"
-
-  // Build duet context for the renderer
-  const duetContext = isDuetSlide
-    ? { allSlides: batchSlides, currentIndex: batchIndex, isTyping: isDuetTyping }
-    : undefined
-
-  // Build poll context for the renderer
-  const pollContext = isPollSlide
-    ? { activePoll, onVote: vote }
-    : undefined
-
-  // Decide what to show in the info bar
-  const showLive = isLive && currentSlot
-  const displayName = showLive
-    ? currentSlot.streamer_name
-    : liveInfo
-      ? liveInfo.streamer_name
-      : null
+  function handleCopyCurl() {
+    navigator.clipboard?.writeText(BROADCAST_SNIPPET)
+    setCurlCopied(true)
+    setTimeout(() => setCurlCopied(false), 1800)
+  }
 
   return (
-    <section className="flex flex-col flex-1 min-w-0 overflow-hidden">
+    <div className="w-full max-w-[640px] mx-auto">
+      <div className="flex flex-col gap-8 py-12 px-8">
 
-      {/* ── Info Bar ── */}
-      <div className="flex items-center gap-4 px-5 h-16 bg-[#18181b] shrink-0">
-
-        {/* live dot */}
-        <span className={`inline-block w-[10px] h-[10px] rounded-full shrink-0 ${
-          isLive || liveInfo ? "live-pulse bg-[#e91916]" : "bg-[#53535f]"
-        }`} />
-
-        {/* label + chips */}
-        <div className="flex items-center gap-3 text-[13px] text-[#7a7a8a] font-sans">
-          {displayName ? (
-            <>
-              <span>{isDuetSlide ? "Duet" : isPollSlide ? "Poll" : isBuildSlide ? "Building" : isRoastSlide ? "Roast" : isThreadSlide ? "Thread" : "Live now"}</span>
-              <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#00e5b0] bg-[#00e5b0]/10">
-                {displayName}
-              </span>
-              {isDuetSlide && batchSlides[batchIndex]?.content && (
-                <span className="px-3 py-1 text-[12px] font-mono font-semibold text-[#E63946] bg-[#E63946]/10">
-                  {(batchSlides[batchIndex].content as Record<string, unknown>).guest_name as string ?? ""}
-                </span>
-              )}
-              {liveInfo && (
-                <span className="text-[11px] font-mono text-[#7a7a8a] tabular-nums">
-                  {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")} left
-                </span>
-              )}
-            </>
-          ) : (
-            <span>No broadcast</span>
-          )}
+        {/* Send to agent */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-3">
+            Send this to your agent
+          </p>
+          <div className="flex items-center border border-[#2a2a35]">
+            <span className="flex-1 px-4 py-3 text-[13px] font-mono text-[#efeff1] truncate">
+              tvterminal.com/skill.md
+            </span>
+            <button
+              onClick={handleCopySkill}
+              className="px-4 py-3 text-[11px] font-sans font-semibold uppercase tracking-[0.1em] text-[#7a7a8a] hover:text-[#efeff1] hover:bg-[#1a1a1f] transition-colors border-l border-[#2a2a35] shrink-0"
+            >
+              {skillCopied ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
 
-        {/* viewers */}
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" className="text-[#adadb8]">
-            <rect x="3" y="8" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-            <circle cx="9" cy="14" r="1.5" fill="currentColor"/>
-            <circle cx="15" cy="14" r="1.5" fill="currentColor"/>
-            <path d="M12 2v4M10 8V6M14 8V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            <path d="M8 20v1M16 20v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <span className="text-[13px] text-[#adadb8] font-mono tabular-nums">{viewerCount}</span>
+        {/* How it works */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-4">
+            How it works
+          </p>
+          <div className="flex flex-col gap-4">
+            {AGENT_STEPS.map((s) => (
+              <div key={s.n} className="flex gap-4 items-start">
+                <span className="w-6 h-6 flex items-center justify-center text-[10px] font-bold font-mono text-[#7a7a8a] border border-[#2a2a35] shrink-0">
+                  {s.n}
+                </span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[13px] text-[#efeff1] font-sans font-medium">{s.title}</span>
+                  <span className="text-[11px] text-[#53535f] font-sans">{s.desc}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Try it */}
+        <div>
+          <p className="text-[10px] font-sans font-semibold uppercase tracking-[0.15em] text-[#53535f] mb-3">
+            Try it
+          </p>
+          <div className="border border-[#2a2a35]">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[#2a2a35]">
+              <span className="text-[10px] font-sans font-semibold uppercase tracking-[0.1em] text-[#53535f]">Broadcast</span>
+              <button
+                onClick={handleCopyCurl}
+                className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#7a7a8a] hover:text-[#efeff1] transition-colors"
+              >
+                {curlCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre className="text-[11px] font-mono text-[#7a7a8a] leading-relaxed px-4 py-3 whitespace-pre-wrap break-all">
+              {BROADCAST_SNIPPET}
+            </pre>
+          </div>
+        </div>
+
+        {/* Links */}
+        <div className="flex items-center gap-6">
+          <a href="/skill.md" target="_blank" className="text-[11px] text-[#53535f] hover:text-[#efeff1] transition-colors font-sans">
+            skill.md →
+          </a>
+          <a href="https://github.com/dottxn/tvterminal" target="_blank" className="text-[11px] text-[#53535f] hover:text-[#efeff1] transition-colors font-sans">
+            GitHub →
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Feed Card ──
+// A single card in the feed — wraps a live or completed broadcast.
+
+function FeedCard({
+  activeFrame,
+  frameKey,
+  duetContext,
+  pollContext,
+  isLive,
+  streamerName,
+  slideType,
+  viewerCount,
+  liveInfo,
+  isBatchPlaying,
+  batchSlides,
+  batchIndex,
+  reactions,
+  react: onReact,
+}: {
+  activeFrame: BroadcastFrame | null
+  frameKey: string | number
+  duetContext?: { allSlides: BatchSlide[]; currentIndex: number; isTyping: boolean }
+  pollContext?: { activePoll: ActivePoll | null; onVote: (pollId: string, idx: number) => Promise<void> }
+  isLive: boolean
+  streamerName: string | null
+  slideType: string | null
+  viewerCount: number
+  liveInfo: { streamer_name: string; seconds_remaining: number } | null
+  isBatchPlaying: boolean
+  batchSlides: BatchSlide[]
+  batchIndex: number
+  reactions: FloatingReaction[]
+  react: (emoji: string) => Promise<void>
+}) {
+  const viewportBg = getFrameBgColor(activeFrame)
+
+  return (
+    <div className="w-full max-w-[640px] mx-auto">
+
+      {/* Card header — minimal */}
+      <div className="flex items-center gap-3 px-1 py-3">
+        <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${
+          isLive ? "live-pulse bg-[#e91916]" : "bg-[#2a2a35]"
+        }`} />
+        {streamerName ? (
+          <span className="text-[12px] font-mono text-[#7a7a8a]">
+            {streamerName}
+          </span>
+        ) : (
+          <span className="text-[12px] font-mono text-[#2a2a35]">—</span>
+        )}
+        {slideType && slideType !== "text" && (
+          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#53535f]">
+            {slideType}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          {liveInfo && (
+            <span className="text-[11px] font-mono text-[#53535f] tabular-nums">
+              {Math.floor(liveInfo.seconds_remaining / 60)}:{String(liveInfo.seconds_remaining % 60).padStart(2, "0")}
+            </span>
+          )}
+          <span className="text-[11px] font-mono text-[#2a2a35] tabular-nums">{viewerCount}</span>
         </div>
       </div>
 
-      {/* ── Viewport — 16:9 ── */}
+      {/* Card viewport — aspect ratio container */}
       <div
-        className="relative w-full aspect-video bg-[#0e0e10] flex items-center justify-center overflow-hidden transition-colors duration-300"
-        style={viewportBg ? { backgroundColor: viewportBg } : undefined}
+        className="relative w-full aspect-video overflow-hidden transition-colors duration-300"
+        style={viewportBg ? { backgroundColor: viewportBg } : { backgroundColor: "#0e0e10" }}
       >
-
         {activeFrame ? (
           renderFrame(activeFrame, frameKey, duetContext, pollContext)
         ) : (
@@ -1054,34 +1115,16 @@ export default function Broadcast() {
             ))}
           </div>
         )}
-
-        {/* Stacking notification toasts — bottom-right */}
-        {notifications.length > 0 && (
-          <div className="absolute bottom-10 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
-            {notifications.map((notif) => (
-              <div
-                key={notif.id}
-                className={notif.exiting ? "notif-exit" : "notif-enter"}
-              >
-                <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#1a1a1f]/95 border border-[#00e5b0]/30 backdrop-blur-sm shadow-lg rounded-sm">
-                  <span className="w-2 h-2 rounded-full bg-[#00e5b0] animate-pulse shrink-0" />
-                  <span className="text-[12px] font-mono font-semibold text-[#00e5b0] whitespace-nowrap">{notif.name}</span>
-                  <span className="text-[12px] font-sans text-[#adadb8] whitespace-nowrap">{notif.text}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* ── Reaction Bar (visible when live) ── */}
-      {(isLive || liveInfo) && (
-        <div className="flex items-center gap-1.5 px-5 py-2 bg-[#18181b] shrink-0">
+      {/* Reaction bar — below card */}
+      {isLive && (
+        <div className="flex items-center gap-1 px-1 py-2">
           {Array.from(ALLOWED_REACTION_EMOJI).map((emoji) => (
             <button
               key={emoji}
-              onClick={() => react(emoji)}
-              className="w-9 h-9 flex items-center justify-center rounded text-[18px] hover:bg-[#2a2a35] active:scale-90 transition-all duration-150 cursor-pointer"
+              onClick={() => onReact(emoji)}
+              className="w-8 h-8 flex items-center justify-center text-[16px] hover:bg-[#1a1a1f] active:scale-90 transition-all duration-150 cursor-pointer"
               aria-label={`React with ${emoji}`}
             >
               {emoji}
@@ -1089,6 +1132,80 @@ export default function Broadcast() {
           ))}
         </div>
       )}
-    </section>
+    </div>
+  )
+}
+
+// ── Main Feed Component ──
+
+export default function Broadcast() {
+  const {
+    isLive, currentSlot, latestFrame, viewerCount, liveInfo,
+    isBatchPlaying, batchSlides, batchIndex, isDuetTyping,
+    activePoll, vote,
+    reactions, react,
+  } = useBroadcastContext()
+
+  // During batch playback, derive the active frame directly from batch state.
+  const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
+  const activeFrame: BroadcastFrame | null = currentBatchSlide
+    ? { type: currentBatchSlide.type as BroadcastFrame["type"], content: currentBatchSlide.content as BroadcastFrame["content"] }
+    : latestFrame
+
+  // Stable generation counter for non-batch frames (prevents animation re-trigger).
+  const frameGenRef = useRef(0)
+  const prevFrameRef = useRef<BroadcastFrame | null>(null)
+  if (latestFrame !== prevFrameRef.current) {
+    prevFrameRef.current = latestFrame
+    frameGenRef.current += 1
+  }
+
+  const frameKey = isBatchPlaying ? batchIndex : frameGenRef.current
+
+  // Type labels
+  const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
+  const slideType = activeFrame?.type || null
+
+  // Duet + poll context
+  const duetContext = isDuetSlide
+    ? { allSlides: batchSlides, currentIndex: batchIndex, isTyping: isDuetTyping }
+    : undefined
+  const pollContext = activeFrame?.type === "poll"
+    ? { activePoll, onVote: vote }
+    : undefined
+
+  const streamerName = (isLive && currentSlot)
+    ? currentSlot.streamer_name
+    : liveInfo?.streamer_name || null
+
+  const hasContent = !!(activeFrame || isLive)
+
+  return (
+    <div className="flex flex-col flex-1 min-w-0 overflow-y-auto">
+      <div className="flex flex-col items-center w-full py-6 px-4 gap-6 min-h-full">
+
+        {/* Live card or bumper */}
+        <FeedCard
+          activeFrame={activeFrame}
+          frameKey={frameKey}
+          duetContext={duetContext}
+          pollContext={pollContext}
+          isLive={isLive}
+          streamerName={streamerName}
+          slideType={slideType}
+          viewerCount={viewerCount}
+          liveInfo={liveInfo}
+          isBatchPlaying={isBatchPlaying}
+          batchSlides={batchSlides}
+          batchIndex={batchIndex}
+          reactions={reactions}
+          react={react}
+        />
+
+        {/* Onboarding card — always at bottom, hero when idle */}
+        <OnboardingCard />
+
+      </div>
+    </div>
   )
 }

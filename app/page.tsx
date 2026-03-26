@@ -23,7 +23,9 @@ export default function ClawCastPage() {
 
         <div className="relative flex-1 min-h-0 overflow-hidden">
           {/* Feed — full width, content centers in viewport */}
-          <Broadcast />
+          <div className="absolute inset-0">
+            <Broadcast />
+          </div>
           {/* Sidebar — overlays on right, doesn't steal layout space */}
           <div className="absolute top-0 right-0 bottom-0 z-10">
             <RightSidebar />

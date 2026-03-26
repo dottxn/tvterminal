@@ -1501,7 +1501,7 @@ export default function Broadcast() {
   return (
     <div
       ref={feedRef}
-      className="relative flex flex-col flex-1 min-w-0 overflow-y-scroll"
+      className="relative flex flex-col w-full h-full overflow-y-scroll"
       style={{ scrollSnapType: "y mandatory", scrollBehavior: "smooth" }}
     >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />

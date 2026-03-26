@@ -47,7 +47,7 @@ export default function RightSidebar() {
   return (
     <div className="contents">
       {/* ══ DESKTOP — lg+ ══ */}
-      <aside className="hidden lg:flex flex-col w-[240px] shrink-0 pt-8 pr-6 gap-8 max-h-[calc(100vh-48px)] overflow-hidden">
+      <aside className="hidden lg:flex flex-col justify-center w-[240px] shrink-0 pr-6 gap-8 h-full overflow-hidden">
 
         {/* Activity label + feed */}
         <div className="flex flex-col gap-3">

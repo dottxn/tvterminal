@@ -1517,47 +1517,54 @@ export default function Broadcast() {
     >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
-      {/* Top spacer — lets first card scroll to viewport center */}
-      <div className="h-[50vh] shrink-0" />
-
-      {/* Idle state — show onboarding when nothing is live and no history */}
+      {/* Idle state — vertically centered onboarding when nothing is live */}
       {!isLive && !activeFrame && feedHistory.length === 0 && (
-        <FeedItem>
-          <OnboardingCard />
-        </FeedItem>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full px-4 lg:px-8">
+            <OnboardingCard />
+          </div>
+        </div>
       )}
 
-      {/* Live card */}
-      {(isLive || activeFrame) && (
-        <FeedItem>
-          <FeedCard
-            activeFrame={activeFrame}
-            frameKey={frameKey}
-            duetContext={duetContext}
-            pollContext={pollContext}
-            isLive={isLive}
-            streamerName={streamerName}
-            slideType={slideType}
-            liveInfo={liveInfo}
-            isBatchPlaying={isBatchPlaying}
-            batchSlides={batchSlides}
-            batchIndex={batchIndex}
-            reactions={reactions}
-            react={react}
-            frameSize={currentFrameSize}
-          />
-        </FeedItem>
+      {/* Feed with spacers — only when there are cards to scroll through */}
+      {(isLive || activeFrame || feedHistory.length > 0) && (
+        <>
+          {/* Top spacer — lets first card scroll to viewport center */}
+          <div className="h-[50vh] shrink-0" />
+
+          {/* Live card */}
+          {(isLive || activeFrame) && (
+            <FeedItem>
+              <FeedCard
+                activeFrame={activeFrame}
+                frameKey={frameKey}
+                duetContext={duetContext}
+                pollContext={pollContext}
+                isLive={isLive}
+                streamerName={streamerName}
+                slideType={slideType}
+                liveInfo={liveInfo}
+                isBatchPlaying={isBatchPlaying}
+                batchSlides={batchSlides}
+                batchIndex={batchIndex}
+                reactions={reactions}
+                react={react}
+                frameSize={currentFrameSize}
+              />
+            </FeedItem>
+          )}
+
+          {/* History cards */}
+          {feedHistory.map((card) => (
+            <FeedItem key={card.slotId}>
+              <HistoryFeedCard card={card} />
+            </FeedItem>
+          ))}
+
+          {/* Bottom spacer — lets last card scroll to viewport center */}
+          <div className="h-[50vh] shrink-0" />
+        </>
       )}
-
-      {/* History cards */}
-      {feedHistory.map((card) => (
-        <FeedItem key={card.slotId}>
-          <HistoryFeedCard card={card} />
-        </FeedItem>
-      ))}
-
-      {/* Bottom spacer — lets last card scroll to viewport center */}
-      <div className="h-[50vh] shrink-0" />
     </div>
   )
 }

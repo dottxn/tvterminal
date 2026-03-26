@@ -4,7 +4,6 @@ import Topbar from "@/components/clawcast/topbar"
 import Broadcast from "@/components/clawcast/broadcast"
 import RightSidebar from "@/components/clawcast/right-sidebar"
 import { BroadcastProvider, useBroadcastContext } from "@/lib/broadcast-context"
-import FabMenu from "@/components/clawcast/fab-menu"
 
 function ViewerCount() {
   const { viewerCount } = useBroadcastContext()
@@ -31,7 +30,6 @@ export default function ClawCastPage() {
         {/* Fixed viewer count — bottom left */}
         <ViewerCount />
       </div>
-      <FabMenu />
     </BroadcastProvider>
   )
 }

@@ -1028,15 +1028,36 @@ function OnboardingCard() {
 }
 
 // ── Snap Panel ──
-// Wraps each card in a full-viewport-height panel for snap-scroll.
+// Full-viewport panel with scale-on-scroll focus effect (à la portorocha).
+// In-view panel is scale(1), out-of-view shrinks to scale(0.92).
 
 function SnapPanel({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(true)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.intersectionRatio > 0.5),
+      { threshold: [0, 0.5, 1] }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div
-      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0 px-4 lg:px-8"
+      ref={ref}
+      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0 lg:pr-[120px]"
       style={{ scrollSnapAlign: "start" }}
     >
-      {children}
+      <div
+        className="transition-transform duration-300 ease-out w-full px-4 lg:px-8"
+        style={{ transform: inView ? "scale(1)" : "scale(0.92)" }}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -1338,13 +1359,11 @@ function HistoryFeedCard({ card }: { card: HistoryCard }) {
       {/* Card header */}
       <div className="flex items-center gap-3 px-1 py-3">
         <span className="w-[6px] h-[6px] rounded-full shrink-0 bg-[#d0d0d0]" />
-        <span className="text-[12px] font-sans text-[#999999]">{card.streamerName}</span>
+        <span className="text-[12px] font-sans text-[#bbbbbb]">{card.streamerName}</span>
         {slideType && slideType !== "text" && (
-          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">{slideType}</span>
+          <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#d0d0d0]">{slideType}</span>
         )}
-        <div className="ml-auto">
-          <span className="text-[10px] font-sans text-[#bbbbbb]">{timeAgo}</span>
-        </div>
+        <span className="ml-auto text-[10px] font-sans text-[#d0d0d0]">{timeAgo}</span>
       </div>
 
       {/* Card viewport — variable aspect ratio */}
@@ -1389,7 +1408,7 @@ function BackToLivePill({ onClick, visible }: { onClick: () => void; visible: bo
   return (
     <button
       onClick={onClick}
-      className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white text-[12px] font-sans font-semibold uppercase tracking-[0.1em] rounded-full shadow-lg pill-enter"
+      className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white text-[12px] font-sans font-medium shadow-lg pill-enter rounded-full"
       aria-label="Back to live"
     >
       <span className="w-2 h-2 rounded-full bg-[#e91916] live-pulse" />
@@ -1412,13 +1431,11 @@ export default function Broadcast() {
   const feedRef = useRef<HTMLDivElement>(null)
   const [showLivePill, setShowLivePill] = useState(false)
 
-  // During batch playback, derive the active frame directly from batch state.
   const currentBatchSlide = isBatchPlaying ? batchSlides[batchIndex] : null
   const activeFrame: BroadcastFrame | null = currentBatchSlide
     ? { type: currentBatchSlide.type as BroadcastFrame["type"], content: currentBatchSlide.content as BroadcastFrame["content"] }
     : latestFrame
 
-  // Stable generation counter for non-batch frames (prevents animation re-trigger).
   const frameGenRef = useRef(0)
   const prevFrameRef = useRef<BroadcastFrame | null>(null)
   if (latestFrame !== prevFrameRef.current) {
@@ -1428,11 +1445,9 @@ export default function Broadcast() {
 
   const frameKey = isBatchPlaying ? batchIndex : frameGenRef.current
 
-  // Type labels
   const isDuetSlide = isBatchPlaying && currentBatchSlide?.type === "duet"
   const slideType = activeFrame?.type || null
 
-  // Duet + poll context
   const duetContext = isDuetSlide
     ? { allSlides: batchSlides, currentIndex: batchIndex, isTyping: isDuetTyping }
     : undefined
@@ -1446,15 +1461,15 @@ export default function Broadcast() {
 
   const currentFrameSize: FrameSize = (currentSlot?.frame_size as FrameSize) || "landscape"
 
-  // Snap-scroll tracking — detect which panel the user is on
+  // Scroll tracking — panel-based
+  const panelHeight = typeof window !== "undefined" ? window.innerHeight - 48 : 800
+
   useEffect(() => {
     const feedEl = feedRef.current
     if (!feedEl) return
 
     function handleScroll() {
       const scrollTop = feedEl!.scrollTop
-      const panelHeight = feedEl!.clientHeight
-      // User is "scrolled away from live" if they've scrolled past half a panel
       const scrolled = scrollTop > panelHeight * 0.5
       isUserScrolledRef.current = scrolled
       setIsUserScrolled(scrolled)
@@ -1463,15 +1478,13 @@ export default function Broadcast() {
 
     feedEl.addEventListener("scroll", handleScroll, { passive: true })
     return () => feedEl.removeEventListener("scroll", handleScroll)
-  }, [isLive, isUserScrolledRef, setIsUserScrolled])
+  }, [isLive, isUserScrolledRef, setIsUserScrolled, panelHeight])
 
-  // Update pill visibility when isLive changes
   useEffect(() => {
     if (!isLive) setShowLivePill(false)
     else if (isUserScrolledRef.current) setShowLivePill(true)
   }, [isLive, isUserScrolledRef])
 
-  // Auto-scroll to top when new slot starts (snap to first panel)
   const prevIsLiveRef = useRef(isLive)
   useEffect(() => {
     if (isLive && !prevIsLiveRef.current && !isUserScrolledRef.current) {
@@ -1488,12 +1501,12 @@ export default function Broadcast() {
   return (
     <div
       ref={feedRef}
-      className="relative flex-1 min-w-0 overflow-y-scroll"
-      style={{ scrollSnapType: "y mandatory" }}
+      className="relative flex flex-col flex-1 min-w-0 overflow-y-scroll"
+      style={{ scrollSnapType: "y mandatory", scrollBehavior: "smooth" }}
     >
       <BackToLivePill onClick={scrollToLive} visible={showLivePill} />
 
-      {/* Live card — first snap panel */}
+      {/* Live card — panel 0 */}
       <SnapPanel>
         <FeedCard
           activeFrame={activeFrame}
@@ -1520,7 +1533,7 @@ export default function Broadcast() {
         </SnapPanel>
       ))}
 
-      {/* Onboarding card — always at bottom */}
+      {/* Onboarding — last snap panel */}
       <SnapPanel>
         <OnboardingCard />
       </SnapPanel>

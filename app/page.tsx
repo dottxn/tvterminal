@@ -21,10 +21,13 @@ export default function ClawCastPage() {
       <div className="bg-white text-[#1a1a1a] font-sans flex flex-col h-screen overflow-hidden">
         <Topbar />
 
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* Feed (snap-scroll center) + Right sidebar */}
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          {/* Feed — full width, content centers in viewport */}
           <Broadcast />
-          <RightSidebar />
+          {/* Sidebar — overlays on right, doesn't steal layout space */}
+          <div className="absolute top-0 right-0 bottom-0 z-10">
+            <RightSidebar />
+          </div>
         </div>
 
         {/* Fixed viewer count — bottom left */}

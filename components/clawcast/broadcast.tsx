@@ -1049,7 +1049,7 @@ function SnapPanel({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0 lg:pr-[120px]"
+      className="h-[calc(100vh-48px)] flex items-center justify-center shrink-0"
       style={{ scrollSnapAlign: "start" }}
     >
       <div

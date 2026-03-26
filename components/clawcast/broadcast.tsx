@@ -24,6 +24,46 @@ function sanitize(str: string): string {
   return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 }
 
+// ── JSON syntax highlighting (GitHub-style) ──
+function highlightJson(line: string): React.ReactNode {
+  // Match JSON tokens: keys, strings, numbers, booleans, null
+  const parts: React.ReactNode[] = []
+  let remaining = line
+  let key = 0
+  const TOKEN = /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(true|false|null)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = TOKEN.exec(line)) !== null) {
+    // Push plain text before this match
+    if (match.index > lastIndex) {
+      parts.push(<span key={key++}>{line.slice(lastIndex, match.index)}</span>)
+    }
+    if (match[1]) {
+      // Key (without the colon)
+      parts.push(<span key={key++} className="text-[#0550ae]">{match[1]}</span>)
+      parts.push(<span key={key++}>:</span>)
+    } else if (match[2]) {
+      // String value
+      parts.push(<span key={key++} className="text-[#0a3069]">{match[2]}</span>)
+    } else if (match[3]) {
+      // Boolean / null
+      parts.push(<span key={key++} className="text-[#0550ae]">{match[3]}</span>)
+    } else if (match[4]) {
+      // Number
+      parts.push(<span key={key++} className="text-[#0550ae]">{match[4]}</span>)
+    }
+    lastIndex = match.index + match[0].length
+  }
+  // Remaining text
+  if (lastIndex < line.length) {
+    parts.push(<span key={key++}>{line.slice(lastIndex)}</span>)
+  }
+  remaining = ""
+  if (parts.length === 0) return line
+  return <>{remaining}{parts}</>
+}
+
 // ── Content type for renderers ──
 interface SlideContent {
   text?: string
@@ -814,7 +854,7 @@ function PostCard({ post }: { post: Post }) {
     </div>
   )
 
-  // ── Agent view: raw JSON ──
+  // ── Agent view: raw JSON (GitHub-style code block) ──
   if (isAgent) {
     const jsonPayload = {
       id: post.id,
@@ -826,11 +866,26 @@ function PostCard({ post }: { post: Post }) {
       created_at: post.created_at,
       slides: post.slides,
     }
+    const jsonLines = JSON.stringify(jsonPayload, null, 2).split("\n")
     return (
-      <div className="w-full lg:max-w-[720px] mx-auto">
+      <div className={`w-full ${maxWidth} mx-auto`}>
         {header}
-        <div className="relative w-full overflow-hidden bg-[#0e0e10]" style={{ aspectRatio: "16/9" }}>
-          <pre className="absolute inset-0 overflow-auto p-4 text-[11px] leading-relaxed font-mono text-[#a0ffa0] whitespace-pre-wrap break-all scrollbar-thin">{JSON.stringify(jsonPayload, null, 2)}</pre>
+        <div
+          className="relative w-full overflow-hidden rounded-md border border-[#d1d9e0]"
+          style={{ aspectRatio }}
+        >
+          <div className="absolute inset-0 flex overflow-auto bg-[#f6f8fa]">
+            {/* Line numbers */}
+            <div className="shrink-0 select-none border-r border-[#d1d9e0] bg-[#f6f8fa] px-2 pt-3 pb-3 text-right">
+              {jsonLines.map((_, i) => (
+                <div key={i} className="text-[11px] leading-[18px] font-mono text-[#656d76]">{i + 1}</div>
+              ))}
+            </div>
+            {/* Code */}
+            <pre className="flex-1 px-3 pt-3 pb-3 text-[11px] leading-[18px] font-mono text-[#1f2328] whitespace-pre overflow-x-auto">{jsonLines.map((line, i) => (
+              <div key={i}>{highlightJson(line)}</div>
+            ))}</pre>
+          </div>
         </div>
       </div>
     )

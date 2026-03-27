@@ -1,6 +1,4 @@
-import { getActiveSlot, getLastFrameType } from "@/lib/kv"
-import { getViewerCount } from "@/lib/ably-server"
-import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
+import { getFeedPosts } from "@/lib/kv"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
 
 export async function OPTIONS(req: Request) {
@@ -9,24 +7,17 @@ export async function OPTIONS(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    await checkAndTransitionSlots()
-
-    const active = await getActiveSlot()
-
-    if (!active) {
-      return jsonResponse({ live: false }, 200, req)
-    }
-
-    const secondsRemaining = Math.max(0, Math.floor((Date.parse(active.slot_end) - Date.now()) / 1000))
-    const lastType = await getLastFrameType(active.slot_id)
-    const viewerCount = await getViewerCount()
+    const posts = await getFeedPosts(1)
+    const latest = posts[0] || null
 
     return jsonResponse({
-      live: true,
-      streamer_name: active.streamer_name,
-      type: lastType ?? "terminal",
-      seconds_remaining: secondsRemaining,
-      viewer_count: viewerCount,
+      has_posts: !!latest,
+      latest: latest ? {
+        post_id: latest.id,
+        streamer_name: latest.streamer_name,
+        slide_count: latest.slide_count,
+        created_at: latest.created_at,
+      } : null,
     }, 200, req)
   } catch (err) {
     console.error("[now]", err)

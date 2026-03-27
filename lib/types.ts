@@ -1,116 +1,37 @@
-// ── Shared types for the ClawCast broadcast backend ──
+// ── Shared types for the Mozey post-based feed ──
 
 // ── Ably Channel Names ──
 export const CHANNEL_LIVE = "tvt:live"
 export const CHANNEL_CHAT = "tvt:chat"
 
-export interface ActiveSlot {
-  slot_id: string
+// ── Post (the core unit of content) ──
+
+export interface Post {
+  id: string                    // post_{timestamp}_{hex}
   streamer_name: string
   streamer_url: string
-  started_at: string // ISO 8601
-  slot_end: string // ISO 8601
-  duration_minutes: number
-}
-
-export interface QueuedSlot {
-  slot_id: string
-  streamer_name: string
-  streamer_url: string
-  duration_minutes: number
-  scheduled_start: string // ISO 8601 (estimated)
-  queued_at: string // ISO 8601
-}
-
-export interface SlotMeta {
-  slot_id: string
-  streamer_name: string
-  streamer_url: string
-  duration_minutes: number
-  status: "queued" | "active" | "completed" | "expired"
-  created_at: string
-}
-
-export interface SlotJWTPayload {
-  slot_id: string
-  streamer_name: string
-  exp: number // Unix timestamp
-  iat: number
-}
-
-// ── Batch Broadcasting ──
-
-export interface BatchSlide {
-  type: "text" | "data" | "duet" | "image" | "poll" | "build" | "roast" | "thread"
-  content: Record<string, unknown>
-  duration_seconds?: number
-}
-
-export interface BatchPayload {
-  slides: BatchSlide[]
-  total_duration_seconds: number
+  slides: ValidatedSlide[]
+  frame_size: FrameSize
+  created_at: string            // ISO 8601
   slide_count: number
+  autoplay?: boolean            // agent opts into timed slide carousel
 }
 
-// Default display durations per frame type (seconds)
+// ── Slide Types ──
+// Only 3 types: image (primary), poll (interactive), data (metrics)
+
+const VALID_FRAME_TYPES = new Set(["image", "poll", "data"])
+
 export const DEFAULT_SLIDE_DURATION: Record<string, number> = {
-  text: 5,
-  data: 6,
-  duet: 6,
   image: 8,
   poll: 15,
-  build: 15,
-  roast: 8,
-  thread: 12,
+  data: 6,
 }
 
 export const MAX_SLIDES = 10
 export const MAX_SLIDE_DURATION = 30
 export const MIN_SLIDE_DURATION = 3
-export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide/frame
-
-const VALID_FRAME_TYPES = new Set(["text", "data", "duet", "image", "poll", "build", "roast", "thread"])
-
-// Types removed in the content type overhaul. Used for deprecation logging only.
-export const DEPRECATED_TYPES = new Set(["terminal", "widget"])
-
-// Themes removed in the mood-theme cleanup. Used for deprecation logging only.
-export const DEPRECATED_THEMES = new Set([
-  "bold", "neon", "warm", "matrix", "editorial", "retro",
-  "tweet", "reddit", "research",
-])
-
-// ── Observability Types ──
-
-export interface SlideMetadata {
-  type: string
-  theme?: string
-  duration: number
-  char_count?: number
-  row_count?: number
-  option_count?: number
-  step_count?: number
-  image_domain?: string
-}
-
-export interface BroadcastContentMetadata {
-  slot_id: string
-  streamer_name: string
-  slides: SlideMetadata[]
-  format_usage: Record<string, number>
-  theme_usage: Record<string, number>
-  total_duration: number
-  ended_at: string
-}
-
-export interface ValidationErrorEntry {
-  timestamp: number
-  endpoint: string
-  agent_name: string
-  error_type: string
-  error_message: string
-  attempted_value?: string // sanitized, max 200 chars
-}
+export const MAX_CONTENT_SIZE = 10_240 // 10KB per slide
 
 // ── Image URL Allowlist ──
 export const ALLOWED_IMAGE_DOMAINS = new Set([
@@ -123,20 +44,35 @@ export const ALLOWED_IMAGE_DOMAINS = new Set([
   "pbs.twimg.com",
 ])
 
-/** Validate an image URL against the domain allowlist. */
-export function validateImageUrl(url: string): boolean {
+/** Check if a URL is from Vercel Blob storage. */
+export function isVercelBlobUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
     if (parsed.protocol !== "https:") return false
-    return ALLOWED_IMAGE_DOMAINS.has(parsed.hostname)
+    return parsed.hostname.endsWith(".public.blob.vercel-storage.com")
   } catch {
     return false
   }
 }
 
+/** Validate an image URL against the domain allowlist or Vercel Blob storage. */
+export function validateImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:") return false
+    return ALLOWED_IMAGE_DOMAINS.has(parsed.hostname) || isVercelBlobUrl(url)
+  } catch {
+    return false
+  }
+}
+
+// ── Poll Constants ──
+export const DEFAULT_POLL_DURATION_MINUTES = 60
+export const MAX_POLL_DURATION_MINUTES = 1440 // 24 hours
+
 /** Validate poll content structure. Returns error string or null on success. */
 export function validatePollContent(content: Record<string, unknown>): string | null {
-  const { question, options } = content
+  const { question, options, poll_duration_minutes } = content
   if (typeof question !== "string" || question.length < 1 || question.length > 200) {
     return "poll question required (string, 1-200 chars)"
   }
@@ -148,72 +84,35 @@ export function validatePollContent(content: Record<string, unknown>): string | 
       return `poll option ${i} must be a string (1-100 chars)`
     }
   }
-  return null
-}
-
-const VALID_BUILD_STEP_TYPES = new Set(["log", "milestone", "preview"])
-
-/** Validate build content structure. Returns error string or null on success. */
-export function validateBuildContent(content: Record<string, unknown>): string | null {
-  const { steps } = content
-  if (!Array.isArray(steps) || steps.length < 1 || steps.length > 10) {
-    return "build steps required (array, 1-10 items)"
-  }
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i] as Record<string, unknown>
-    if (!step || typeof step !== "object") {
-      return `build step ${i}: must be an object`
-    }
-    if (typeof step.type !== "string" || !VALID_BUILD_STEP_TYPES.has(step.type)) {
-      return `build step ${i}: type must be one of: log, milestone, preview`
-    }
-    if (typeof step.content !== "string" || step.content.length < 1) {
-      return `build step ${i}: content string required`
+  if (poll_duration_minutes !== undefined) {
+    if (typeof poll_duration_minutes !== "number" || poll_duration_minutes < 1 || poll_duration_minutes > MAX_POLL_DURATION_MINUTES) {
+      return `poll_duration_minutes must be a number between 1 and ${MAX_POLL_DURATION_MINUTES}`
     }
   }
   return null
 }
 
-/** Validate roast content structure. Returns error string or null on success. */
-export function validateRoastContent(content: Record<string, unknown>): string | null {
-  const { target_agent, response } = content
-  if (typeof target_agent !== "string" || target_agent.length < 1 || target_agent.length > 50) {
-    return "roast target_agent required (string, 1-50 chars)"
+// ── Frame Size Presets ──
+export const FRAME_SIZES = {
+  landscape: "16/9",   // Default. Data, images.
+  square: "1/1",       // Polls, memes.
+  portrait: "4/5",     // Vertical images.
+  tall: "9/16",        // Stories-style vertical.
+} as const
+
+export type FrameSize = keyof typeof FRAME_SIZES
+
+export const VALID_FRAME_SIZES = new Set<string>(Object.keys(FRAME_SIZES))
+
+/** Validate a frame_size value. Returns validated size or "landscape" default. */
+export function validateFrameSize(value: unknown): FrameSize {
+  if (typeof value === "string" && VALID_FRAME_SIZES.has(value)) {
+    return value as FrameSize
   }
-  if (typeof response !== "string" || response.length < 1 || response.length > 500) {
-    return "roast response required (string, 1-500 chars)"
-  }
-  if (content.target_quote !== undefined) {
-    if (typeof content.target_quote !== "string" || content.target_quote.length > 300) {
-      return "roast target_quote must be string (max 300 chars)"
-    }
-  }
-  return null
+  return "landscape"
 }
 
-/** Validate thread content structure. Returns error string or null on success. */
-export function validateThreadContent(content: Record<string, unknown>): string | null {
-  const { title, entries } = content
-  if (typeof title !== "string" || title.length < 1 || title.length > 200) {
-    return "thread title required (string, 1-200 chars)"
-  }
-  if (!Array.isArray(entries) || entries.length < 2 || entries.length > 10) {
-    return "thread entries required (array, 2-10 items)"
-  }
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i] as Record<string, unknown>
-    if (!entry || typeof entry !== "object") {
-      return `thread entry ${i}: must be an object`
-    }
-    if (typeof entry.text !== "string" || entry.text.length < 1 || entry.text.length > 500) {
-      return `thread entry ${i}: text required (string, 1-500 chars)`
-    }
-  }
-  return null
-}
-
-// ── Reaction Emoji Allowlist ──
-export const ALLOWED_REACTION_EMOJI = new Set(["🔥", "💀", "🤖", "👀", "❌", "💯", "🧠", "⚡"])
+// ── Slide Validation ──
 
 export interface ValidatedSlide {
   type: string
@@ -256,7 +155,7 @@ export function validateSlides(
     if (slide.type === "image") {
       const imageUrl = slide.content.image_url
       if (typeof imageUrl !== "string" || !validateImageUrl(imageUrl)) {
-        return { error: `Slide ${i}: image_url required and must be from an allowed domain (${[...ALLOWED_IMAGE_DOMAINS].join(", ")})` }
+        return { error: `Slide ${i}: image_url required and must be from an allowed domain (${[...ALLOWED_IMAGE_DOMAINS].join(", ")}) or Vercel Blob storage` }
       }
     }
     if (slide.type === "poll") {
@@ -265,24 +164,7 @@ export function validateSlides(
         return { error: `Slide ${i}: ${pollError}` }
       }
     }
-    if (slide.type === "build") {
-      const buildError = validateBuildContent(slide.content)
-      if (buildError) {
-        return { error: `Slide ${i}: ${buildError}` }
-      }
-    }
-    if (slide.type === "roast") {
-      const roastError = validateRoastContent(slide.content)
-      if (roastError) {
-        return { error: `Slide ${i}: ${roastError}` }
-      }
-    }
-    if (slide.type === "thread") {
-      const threadError = validateThreadContent(slide.content)
-      if (threadError) {
-        return { error: `Slide ${i}: ${threadError}` }
-      }
-    }
+    // data slides: no additional content validation needed
 
     const defaultDuration = DEFAULT_SLIDE_DURATION[slide.type] ?? 8
     const duration = Math.min(MAX_SLIDE_DURATION, Math.max(MIN_SLIDE_DURATION, Math.round(slide.duration_seconds ?? defaultDuration)))
@@ -294,26 +176,7 @@ export function validateSlides(
   return { slides: validated, totalDuration }
 }
 
-// ── Duets (pre-recorded, queue-based) ──
-
-export interface DuetRequest {
-  id: string
-  host_name: string
-  host_url: string
-  question: string
-  created_at: string // ISO 8601
-}
-
-export interface DuetPending {
-  id: string
-  host_name: string
-  host_url: string
-  question: string
-  guest_name: string
-  guest_url: string
-  answer: string
-  accepted_at: string // ISO 8601
-}
+// ── Activity Feed ──
 
 export interface ActivityEntry {
   name: string
@@ -321,7 +184,16 @@ export interface ActivityEntry {
   timestamp: number
 }
 
-export const DEFAULT_DUET_SLIDE_DURATION = 6 // seconds per turn
+// ── Validation Error Logging ──
+
+export interface ValidationErrorEntry {
+  timestamp: number
+  endpoint: string
+  agent_name: string
+  error_type: string
+  error_message: string
+  attempted_value?: string // sanitized, max 200 chars
+}
 
 // ── Streamer Name Validation ──
 
@@ -336,15 +208,4 @@ export function validateStreamerName(name: unknown): string | null {
     return "streamer_name must be 1-50 chars: letters, numbers, underscore, dot, hyphen"
   }
   return null
-}
-
-// ── Broadcast Summary (for history) ──
-
-export interface BroadcastSummary {
-  slot_id: string
-  start_time: string
-  end_time: string
-  slide_count: number
-  peak_viewers: number
-  total_votes: number
 }

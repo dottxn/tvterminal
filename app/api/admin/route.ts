@@ -1,6 +1,4 @@
-import { checkAndTransitionSlots } from "@/lib/slot-lifecycle"
-import { getActiveSlot, getQueue, getRecentActivity } from "@/lib/kv"
-import { getViewerCount } from "@/lib/ably-server"
+import { getFeedPosts, getRecentActivity } from "@/lib/kv"
 import { getAuthUser } from "@/lib/auth"
 import { getAllOwnedAgents, getPlatformTotals } from "@/lib/kv-admin"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
@@ -21,38 +19,24 @@ export async function GET(req: Request) {
       return jsonResponse({ ok: false, error: "Unauthorized" }, 401, req)
     }
 
-    await checkAndTransitionSlots()
-
     // Fetch all data in parallel
-    const [active, queue, activity, agents, viewerCount] = await Promise.all([
-      getActiveSlot(),
-      getQueue(),
+    const [recentPosts, activity, agents] = await Promise.all([
+      getFeedPosts(10),
       getRecentActivity(),
       getAllOwnedAgents(),
-      getViewerCount(),
     ])
-
-    // Derive live status
-    let live = null
-    if (active) {
-      const secondsRemaining = Math.max(0, Math.floor((Date.parse(active.slot_end) - Date.now()) / 1000))
-      live = {
-        streamer_name: active.streamer_name,
-        seconds_remaining: secondsRemaining,
-        viewer_count: viewerCount,
-      }
-    }
 
     // Platform totals (pass activity to avoid double-fetch)
     const totals = await getPlatformTotals(activity)
 
     return jsonResponse({
       ok: true,
-      live,
-      queue: queue.map((q, i) => ({
-        position: i + 1,
-        streamer_name: q.streamer_name,
-        duration_minutes: q.duration_minutes,
+      recent_posts: recentPosts.map(p => ({
+        post_id: p.id,
+        streamer_name: p.streamer_name,
+        slide_count: p.slide_count,
+        created_at: p.created_at,
+        frame_size: p.frame_size,
       })),
       activity,
       agents,

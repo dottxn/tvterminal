@@ -3,33 +3,33 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* ClawCast — Twitch-energy dark palette */
-  --background:        #0e0e10;
-  --foreground:        #efeff1;
+  /* ClawCast — Clean light palette */
+  --background:        #ffffff;
+  --foreground:        #1a1a1a;
 
-  --panel:             #18181b;
-  --panel-alt:         #1f1f23;
-  --panel-raised:      #26262c;
-  --panel-hover:       #2e2e35;
+  --panel:             #f5f5f5;
+  --panel-alt:         #f0f0f0;
+  --panel-raised:      #e8e8e8;
+  --panel-hover:       #e0e0e0;
 
-  --border:            #2a2a35;
-  --border-subtle:     #1e1e24;
-  --border-strong:     #3d3d4a;
+  --border:            #e5e5e5;
+  --border-subtle:     #f0f0f0;
+  --border-strong:     #d0d0d0;
 
-  --text-primary:      #efeff1;
-  --text-secondary:    #adadb8;
-  --text-muted:        #7a7a8a;
-  --text-dim:          #53535f;
+  --text-primary:      #1a1a1a;
+  --text-secondary:    #666666;
+  --text-muted:        #999999;
+  --text-dim:          #bbbbbb;
 
   --brand:             #E63946;
   --brand-hover:       #f05460;
-  --brand-dim:         #4a1217;
-  --brand-glow:        rgba(145, 71, 255, 0.18);
+  --brand-dim:         #fce8ea;
+  --brand-glow:        rgba(230, 57, 70, 0.12);
 
   --live-red:          #e91916;
-  --live-red-dim:      rgba(233, 25, 22, 0.15);
+  --live-red-dim:      rgba(233, 25, 22, 0.08);
   --green:             #00c853;
-  --green-dim:         rgba(0, 200, 83, 0.15);
+  --green-dim:         rgba(0, 200, 83, 0.08);
 }
 
 @theme inline {
@@ -43,7 +43,7 @@
 
   --color-background:       var(--background);
   --color-foreground:       var(--foreground);
-  --color-border:           #2a2a35;
+  --color-border:           #e5e5e5;
 
   /* direct-use tokens */
   --color-panel:          var(--panel);
@@ -58,8 +58,8 @@
   --color-text-dim:       var(--text-dim);
   --color-brand:          #E63946;
   --color-brand-hover:    #f05460;
-  --color-brand-dim:      #4a1217;
-  --color-brand-glow:     rgba(230,57,70,0.18);
+  --color-brand-dim:      #fce8ea;
+  --color-brand-glow:     rgba(230,57,70,0.12);
   --color-live-red:       var(--live-red);
   --color-live-red-dim:   var(--live-red-dim);
   --color-green:          var(--green);
@@ -74,10 +74,9 @@
     @apply bg-background text-foreground;
   }
 
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: var(--panel); }
-  ::-webkit-scrollbar-thumb { background: var(--panel-raised); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--panel-hover); }
+  /* Hide scrollbars — wireframe aesthetic */
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
 }
 
 /* ── Ticker ── */
@@ -87,19 +86,6 @@
 }
 .ticker-track { animation: ticker-scroll 55s linear infinite; }
 
-/* ── Live pulse ── */
-@keyframes live-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(233,25,22,0.5); }
-  50%       { opacity: 0.75; box-shadow: 0 0 0 4px rgba(233,25,22,0); }
-}
-.live-pulse { animation: live-pulse 1.6s ease-in-out infinite; }
-
-/* ── Purple glow pulse ── */
-@keyframes purple-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(230,57,70,0.4); }
-  60%       { box-shadow: 0 0 0 5px rgba(230,57,70,0); }
-}
-.purple-pulse { animation: purple-pulse 2s ease-out infinite; }
 
 /* ── Chat message pop-in ── */
 @keyframes msg-in {
@@ -108,26 +94,6 @@
 }
 .msg-in { animation: msg-in 0.18s ease-out forwards; }
 
-/* ── Viewer count tick ── */
-@keyframes count-tick {
-  0%   { transform: translateY(0); }
-  40%  { transform: translateY(-3px); }
-  100% { transform: translateY(0); }
-}
-.count-tick { animation: count-tick 0.25s ease-out; }
-
-/* ── Energy bar fill ── */
-@keyframes bar-fill {
-  from { width: 0%; }
-}
-.bar-fill { animation: bar-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-
-/* ── Batch progress bar (IG stories style) ── */
-@keyframes bar-progress {
-  from { width: 0%; }
-  to   { width: 100%; }
-}
-.bar-progress { animation: bar-progress linear forwards; /* duration via inline style */ }
 
 /* ── Text view entrance ── */
 @keyframes text-view-enter {
@@ -136,45 +102,30 @@
 }
 .text-view-enter { animation: text-view-enter 0.3s ease-out forwards; }
 
-@keyframes typing-bounce {
-  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-4px); }
-}
-.typing-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: typing-bounce 1.4s ease-in-out infinite;
-}
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
-/* ── Notification slide-in from right ── */
-@keyframes notif-enter {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
+/* ── Feed card entrance (new cards slide up from below) ── */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes notif-exit {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(24px); }
-}
-.notif-enter { animation: notif-enter 0.25s ease-out forwards; }
-.notif-exit  { animation: notif-exit 0.2s ease-in forwards; }
+.card-enter { animation: card-enter 0.3s ease-out forwards; }
 
-/* ── Build step enter ── */
-@keyframes build-step-enter {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.build-step-enter { animation: build-step-enter 0.25s ease-out forwards; }
 
-/* ── Floating reaction ── */
-@keyframes floatUp {
-  0%   { transform: translateY(0) scale(0.5); opacity: 0; }
-  10%  { transform: translateY(-20px) scale(1); opacity: 1; }
-  80%  { opacity: 1; }
-  100% { transform: translateY(-200px) scale(1.1); opacity: 0; }
+/* ── Carousel auto-play progress ── */
+@keyframes carousel-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
-.reaction-enter { animation: floatUp 3s ease-out forwards; }
+.carousel-progress {
+  animation: carousel-progress linear forwards;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .ticker-track { animation: none; }
+}

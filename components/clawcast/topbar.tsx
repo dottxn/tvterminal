@@ -38,37 +38,22 @@ export default function Topbar() {
 
   return (
     <>
-      {/* ── Main nav ── */}
-      <header className="flex items-center h-12 px-4 shrink-0 bg-[#18181b] z-10">
-        {/* Logo */}
-        <a href="/" className="flex items-baseline gap-px no-underline group shrink-0">
-          <span className="text-[#efeff1] font-sans font-bold text-[20px] tracking-tight group-hover:text-[#f05460] transition-colors">
-            clawcast
-          </span>
-          <span className="text-[#E63946] font-sans font-bold text-[20px] tracking-tight">.tv</span>
-        </a>
+      <header className="flex items-center h-12 px-4 lg:px-6 shrink-0 bg-white z-10">
+        {/* Brand */}
+        <h1 className="shrink-0">
+          <a href="/" className="text-[#1a1a1a] font-sans font-semibold text-[15px] tracking-tight no-underline uppercase min-h-[44px] flex items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]">
+            Mosey
+          </a>
+        </h1>
 
-        {/* Beta badge */}
-        <div className="flex items-center ml-4 px-2.5 py-1 bg-[#E63946]/10 shrink-0">
-          <span className="text-[10px] text-[#E63946] uppercase tracking-[0.16em] font-sans font-bold">beta</span>
-        </div>
-
-        {/* Centre — Agent quick start — desktop only */}
-        <div className="hidden lg:flex flex-1 items-center justify-center gap-2.5">
-          <span className="text-[10px] text-[#7a7a8a] uppercase tracking-[0.14em] font-sans shrink-0">
-            Agent quick start
-          </span>
-          <div className="flex items-center bg-[#1a1a1f] overflow-hidden border border-[#2a2a35]">
-            <span className="px-3 py-1.5 text-[11px] font-mono text-[#efeff1] tracking-wide">
-              tvterminal.com/skill.md
-            </span>
-            <button
-              onClick={handleCopy}
-              className="px-3 py-1.5 text-[10px] font-sans font-semibold tracking-[0.1em] uppercase text-[#adadb8] hover:text-[#efeff1] hover:bg-[#26262c] transition-colors border-l border-[#2a2a35]"
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
+        {/* Centre — Quickstart — desktop only */}
+        <div className="hidden lg:flex flex-1 items-center justify-center">
+          <button
+            onClick={handleCopy}
+            className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors cursor-pointer min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
+          >
+            {copied ? "Copied!" : "Quickstart: tvterminal.com/skill.md"}
+          </button>
         </div>
 
         {/* Spacer on mobile */}
@@ -77,20 +62,20 @@ export default function Topbar() {
         {/* Right — Auth */}
         <div className="flex items-center shrink-0">
           {loading ? (
-            <span className="w-16 h-4 bg-[#26262c] animate-pulse" />
+            <span className="w-12 h-3 bg-[#f0f0f0] animate-pulse" />
           ) : user ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="px-3 py-1 text-[12px] font-sans font-medium text-[#adadb8] hover:text-[#efeff1] transition-colors"
+                className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors min-h-[44px] px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
               >
                 {truncatedEmail}
               </button>
               {dropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-[#1a1a1f] border border-[#2a2a35] z-50 shadow-lg">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#e5e5e5] z-50 shadow-sm">
                   <a
                     href="/dashboard"
-                    className="block px-4 py-2.5 text-[12px] text-[#adadb8] hover:text-[#efeff1] hover:bg-[#26262c] transition-colors"
+                    className="block px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors min-h-[44px] flex items-center"
                   >
                     Dashboard
                   </a>
@@ -99,7 +84,7 @@ export default function Topbar() {
                       setDropdownOpen(false)
                       await logout()
                     }}
-                    className="block w-full text-left px-4 py-2.5 text-[12px] text-[#adadb8] hover:text-[#efeff1] hover:bg-[#26262c] transition-colors border-t border-[#2a2a35]"
+                    className="block w-full text-left px-4 py-2.5 text-[13px] text-[#666666] hover:text-[#1a1a1a] hover:bg-[#f5f5f5] transition-colors border-t border-[#e5e5e5] min-h-[44px]"
                   >
                     Logout
                   </button>
@@ -109,7 +94,7 @@ export default function Topbar() {
           ) : (
             <button
               onClick={() => setLoginOpen(true)}
-              className="px-3 py-1 text-[12px] font-sans font-medium text-[#adadb8] hover:text-[#efeff1] transition-colors"
+              className="text-[13px] font-sans text-[#999999] hover:text-[#1a1a1a] transition-colors min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1a1a1a]"
             >
               Login
             </button>

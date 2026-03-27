@@ -26,14 +26,11 @@ import {
   getAgentPosts,
   pushActivity,
   getRecentActivity,
-  logDeprecatedFormat,
-  saveBroadcastContent,
-  getBroadcastContent,
   logValidationError,
   getValidationErrors,
 } from "@/lib/kv"
 
-import type { Post, BroadcastContentMetadata, ValidationErrorEntry } from "@/lib/types"
+import type { Post, ValidationErrorEntry } from "@/lib/types"
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -48,7 +45,7 @@ function makePost(overrides: Partial<Post> = {}): Post {
     id: "post_1234_abcd",
     streamer_name: "test-agent",
     streamer_url: "https://test.com",
-    slides: [{ type: "text", content: { body: "hello" }, duration_seconds: 8 }],
+    slides: [{ type: "image", content: { image_url: "https://i.imgur.com/abc.png" }, duration_seconds: 8 }],
     frame_size: "square",
     created_at: "2025-01-01T00:00:00.000Z",
     slide_count: 1,
@@ -200,51 +197,6 @@ describe("getRecentActivity", () => {
     const result = await getRecentActivity()
     expect(result).toHaveLength(1)
     expect(result[0].name).toBe("bot")
-  })
-})
-
-// ══════════════════════════════════════════
-// Deprecated Format Logging
-// ══════════════════════════════════════════
-
-describe("logDeprecatedFormat", () => {
-  it("increments counter with 7-day TTL", async () => {
-    mockRedis.incr.mockResolvedValue(1)
-    mockRedis.expire.mockResolvedValue(1)
-    await logDeprecatedFormat("bold")
-    expect(mockRedis.incr).toHaveBeenCalledWith("tvt:deprecated_format:bold")
-    expect(mockRedis.expire).toHaveBeenCalledWith("tvt:deprecated_format:bold", 7 * 24 * 60 * 60)
-  })
-})
-
-// ══════════════════════════════════════════
-// Broadcast Content Metadata
-// ══════════════════════════════════════════
-
-describe("saveBroadcastContent / getBroadcastContent", () => {
-  it("stores metadata with 7-day TTL", async () => {
-    const metadata: BroadcastContentMetadata = {
-      slot_id: "s1",
-      streamer_name: "bot",
-      slides: [],
-      format_usage: {},
-      theme_usage: {},
-      total_duration: 10,
-      ended_at: new Date().toISOString(),
-    }
-    mockRedis.set.mockResolvedValue("OK")
-    await saveBroadcastContent("s1", metadata)
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      "tvt:broadcast_content:s1",
-      JSON.stringify(metadata),
-      { ex: 7 * 24 * 60 * 60 }
-    )
-  })
-
-  it("returns null when no content", async () => {
-    mockRedis.get.mockResolvedValue(null)
-    const result = await getBroadcastContent("s1")
-    expect(result).toBeNull()
   })
 })
 

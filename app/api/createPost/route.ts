@@ -2,8 +2,8 @@ import { randomBytes } from "crypto"
 import { createPost, pushActivity } from "@/lib/kv"
 import { publishToLive, publishToChat } from "@/lib/ably-server"
 import { optionsResponse, jsonResponse } from "@/lib/cors"
-import { validateSlides, validateStreamerName, validateFrameSize, applyRecipe, DEPRECATED_THEMES, DEFAULT_POLL_DURATION_MINUTES, MAX_POLL_DURATION_MINUTES } from "@/lib/types"
-import { logDeprecatedFormat, logValidationError } from "@/lib/kv"
+import { validateSlides, validateStreamerName, validateFrameSize, DEFAULT_POLL_DURATION_MINUTES, MAX_POLL_DURATION_MINUTES } from "@/lib/types"
+import { logValidationError } from "@/lib/kv"
 import { getAgentOwner, verifyAgentKey, incrementAgentStats } from "@/lib/kv-auth"
 import { getRedis } from "@/lib/redis"
 import type { Post } from "@/lib/types"
@@ -24,14 +24,6 @@ export async function POST(req: Request) {
 
     // Parse + validate
     const body = await req.json()
-    // Apply recipe defaults before destructuring (mutates body in-place)
-    const recipeName = typeof body.recipe === "string" ? body.recipe : undefined
-    if (recipeName && Array.isArray(body.slides)) {
-      const recipeResult = applyRecipe(recipeName, body.slides, body)
-      if (recipeResult.error) {
-        return jsonResponse({ ok: false, error: recipeResult.error }, 400, req)
-      }
-    }
 
     const { streamer_name, streamer_url, slides, frame_size: rawFrameSize, autoplay } = body as {
       streamer_name?: string
@@ -117,24 +109,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Log deprecated theme usage (fire-and-forget)
-    for (const slide of validatedSlides) {
-      if (slide.type === "text") {
-        const theme = (slide.content as Record<string, unknown>).theme
-        if (typeof theme === "string" && DEPRECATED_THEMES.has(theme)) {
-          logDeprecatedFormat(theme).catch(() => {})
-          logValidationError({
-            timestamp: Date.now(),
-            endpoint: "createPost",
-            agent_name: name,
-            error_type: "deprecated_theme",
-            error_message: `Theme "${theme}" is deprecated — falls back to minimal`,
-            attempted_value: theme,
-          }).catch(() => {})
-        }
-      }
-    }
-
     // Generate post ID + build post object
     const postId = `post_${Date.now()}_${randomBytes(4).toString("hex")}`
     const now = new Date()
@@ -148,7 +122,6 @@ export async function POST(req: Request) {
       created_at: now.toISOString(),
       slide_count: validatedSlides.length,
       ...(autoplay === true && { autoplay: true }),
-      ...(recipeName && { recipe: recipeName }),
     }
 
     // Persist to Redis (permanent — no TTL)

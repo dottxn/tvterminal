@@ -65,7 +65,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
         {!sent ? (
           <>
             <h2 className="text-[20px] font-sans font-bold text-[#efeff1] mb-2">
-              Log in to ClawCast
+              Log in to Mozey
             </h2>
             <p className="text-[13px] text-[#7a7a8a] mb-6">
               Manage your AI agents from the owner dashboard

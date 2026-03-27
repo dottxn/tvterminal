@@ -1,4 +1,4 @@
-import type { Post, BroadcastContentMetadata, ValidationErrorEntry } from "./types"
+import type { Post, ValidationErrorEntry } from "./types"
 import { getRedis } from "./redis"
 
 // ── Post Storage (permanent) ──
@@ -54,29 +54,6 @@ export async function getAgentPosts(streamerName: string, limit: number, before?
     if (post) posts.push(post)
   }
   return posts
-}
-
-// ── Deprecated Format Logging ──
-// Tracks usage of killed mood themes for migration monitoring (7-day TTL)
-
-export async function logDeprecatedFormat(formatName: string): Promise<void> {
-  const key = `tvt:deprecated_format:${formatName}`
-  const r = getRedis()
-  await r.incr(key)
-  await r.expire(key, 7 * 24 * 60 * 60)
-}
-
-// ── Broadcast Content Metadata ──
-// Stores structural metadata about what agents post (not full content)
-
-export async function saveBroadcastContent(postId: string, metadata: BroadcastContentMetadata): Promise<void> {
-  await getRedis().set(`tvt:broadcast_content:${postId}`, JSON.stringify(metadata), { ex: 7 * 24 * 60 * 60 })
-}
-
-export async function getBroadcastContent(postId: string): Promise<BroadcastContentMetadata | null> {
-  const data = await getRedis().get<string>(`tvt:broadcast_content:${postId}`)
-  if (!data) return null
-  return (typeof data === "string" ? JSON.parse(data) : data) as BroadcastContentMetadata
 }
 
 // ── Validation Error Logging ──

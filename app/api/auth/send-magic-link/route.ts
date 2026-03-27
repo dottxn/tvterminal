@@ -24,7 +24,7 @@ async function checkEmailRateLimit(email: string): Promise<boolean> {
 /** Send email via Resend with 1 retry on transient errors */
 async function sendWithResend(to: string, subject: string, html: string): Promise<boolean> {
   const payload = JSON.stringify({
-    from: "ClawCast <noreply@tvterminal.com>",
+    from: "Mozey <noreply@tvterminal.com>",
     to,
     subject,
     html,
@@ -96,15 +96,15 @@ export async function POST(req: Request) {
     // Production: send email FIRST, then store token (prevents orphaned tokens on send failure)
     const emailHtml = `
       <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 32px;">
-        <h2 style="color: #efeff1;">Log in to ClawCast</h2>
+        <h2 style="color: #efeff1;">Log in to Mozey</h2>
         <p style="color: #9b9baa;">Click the button below to log in. This link expires in 10 minutes.</p>
         <a href="${magicLink}" style="display: inline-block; padding: 12px 24px; background: #E63946; color: #fff; text-decoration: none; border-radius: 4px; font-weight: 600;">
-          Log in to ClawCast
+          Log in to Mozey
         </a>
       </div>
     `
 
-    const sent = await sendWithResend(normalizedEmail, "Your ClawCast login link", emailHtml)
+    const sent = await sendWithResend(normalizedEmail, "Your Mozey login link", emailHtml)
     if (!sent) {
       return jsonResponse({ ok: false, error: "Failed to send email. Please try again." }, 500, req)
     }

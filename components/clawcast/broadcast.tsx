@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useFeedContext } from "@/lib/feed-context"
-import DOMPurify from "isomorphic-dompurify"
 import { FRAME_SIZES, type FrameSize, type Post, type ValidatedSlide } from "@/lib/types"
 
 // Desktop width classes per frame size — cards float centered in snap panels
@@ -19,64 +18,42 @@ function validHex(v: unknown): string | undefined {
   return typeof v === "string" && HEX_RE.test(v) ? v : undefined
 }
 
-// ── Sanitize untrusted content from agents ──
-function sanitize(str: string): string {
-  return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
-}
-
 // ── JSON syntax highlighting (GitHub-style) ──
 function highlightJson(line: string): React.ReactNode {
-  // Match JSON tokens: keys, strings, numbers, booleans, null
   const parts: React.ReactNode[] = []
-  let remaining = line
   let key = 0
   const TOKEN = /("(?:\\.|[^"\\])*")\s*:|("(?:\\.|[^"\\])*")|(true|false|null)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
   while ((match = TOKEN.exec(line)) !== null) {
-    // Push plain text before this match
     if (match.index > lastIndex) {
       parts.push(<span key={key++}>{line.slice(lastIndex, match.index)}</span>)
     }
     if (match[1]) {
-      // Key (without the colon)
       parts.push(<span key={key++} className="text-[#0550ae]">{match[1]}</span>)
       parts.push(<span key={key++}>:</span>)
     } else if (match[2]) {
-      // String value
       parts.push(<span key={key++} className="text-[#0a3069]">{match[2]}</span>)
     } else if (match[3]) {
-      // Boolean / null
       parts.push(<span key={key++} className="text-[#0550ae]">{match[3]}</span>)
     } else if (match[4]) {
-      // Number
       parts.push(<span key={key++} className="text-[#0550ae]">{match[4]}</span>)
     }
     lastIndex = match.index + match[0].length
   }
-  // Remaining text
   if (lastIndex < line.length) {
     parts.push(<span key={key++}>{line.slice(lastIndex)}</span>)
   }
-  remaining = ""
   if (parts.length === 0) return line
-  return <>{remaining}{parts}</>
+  return <>{parts}</>
 }
 
 // ── Content type for renderers ──
 interface SlideContent {
-  text?: string
-  headline?: string
-  body?: string
-  meta?: string
   rows?: Array<{ label: string; value: string; change?: string }>
   data_style?: "default" | "ticker" | "chalk" | "ledger"
-  theme?: string
   bg_color?: string
-  text_color?: string
-  accent_color?: string
-  gif_url?: string
   image_url?: string
   caption?: string
   question?: string
@@ -84,216 +61,9 @@ interface SlideContent {
   poll_id?: string
   poll_expires_at?: number
   poll_duration_minutes?: number
-  steps?: Array<{ type: "log" | "milestone" | "preview"; content: string }>
-  target_agent?: string
-  target_quote?: string
-  response?: string
-  title?: string
-  entries?: Array<{ text: string }>
 }
-
-// ── Text Themes ──
-
-const TEXT_THEMES = {
-  minimal: {
-    bg: "transparent",
-    headline: "#efeff1",
-    body: "#adadb8",
-    meta: "#53535f",
-    font: "font-sans",
-    headlineFont: "font-display-grotesk",
-    headlineSize: "text-[clamp(26px,4vw,42px)]",
-    headlineWeight: "font-medium",
-    headlineTransform: "",
-    headlineTracking: "tracking-tight",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[16px]",
-    bodyWeight: "font-normal",
-    padding: "p-10",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  mono: {
-    bg: "#0e0e10",
-    headline: "#efeff1",
-    body: "#e8e8e8",
-    meta: "#53535f",
-    font: "font-mono",
-    headlineFont: "font-mono",
-    headlineSize: "text-[clamp(16px,2.5vw,22px)]",
-    headlineWeight: "font-semibold",
-    headlineTransform: "",
-    headlineTracking: "tracking-normal",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[13px]",
-    bodyWeight: "font-normal",
-    padding: "p-5",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-  meme: {
-    bg: "#000000",
-    headline: "#ffffff",
-    body: "#ffffff",
-    meta: "#7a7a8a",
-    font: "font-sans",
-    headlineFont: "font-display-bebas",
-    headlineSize: "text-[clamp(32px,6vw,64px)]",
-    headlineWeight: "font-normal",
-    headlineTransform: "uppercase",
-    headlineTracking: "tracking-wide",
-    headlineStyle: "" as "" | "italic",
-    bodySize: "text-[clamp(28px,5vw,56px)]",
-    bodyWeight: "font-normal",
-    padding: "p-0",
-    glow: false,
-    decor: null as null,
-    bodyPrefix: "",
-  },
-} as const
-
-const CUSTOM_LAYOUTS = new Set(["meme"])
-type TextThemeName = keyof typeof TEXT_THEMES
 
 // ── View Components ──
-
-function TextView({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
-  const themeName = (content.theme as TextThemeName) || "minimal"
-  const theme = TEXT_THEMES[themeName] || TEXT_THEMES.minimal
-
-  if (CUSTOM_LAYOUTS.has(themeName)) {
-    return <MemeLayout content={content} frameKey={frameKey} />
-  }
-
-  const headlineColor = validHex(content.text_color) || theme.headline
-  const bodyColor = validHex(content.accent_color) || theme.body
-  const metaColor = validHex(content.accent_color) || theme.meta
-  const gifUrl = typeof content.gif_url === "string" ? content.gif_url : undefined
-
-  return (
-    <div className={`relative flex flex-col items-center justify-center h-full ${theme.padding} text-center`}>
-      {gifUrl && (
-        <>
-          <img src={gifUrl} alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
-          <div className="absolute inset-0 bg-black/60" />
-        </>
-      )}
-      <div key={frameKey} className="relative z-10 max-w-[700px]">
-        {content.headline && (
-          <h2
-            className={`${theme.headlineSize} ${theme.headlineFont} ${theme.headlineWeight} ${theme.headlineTransform} ${theme.headlineTracking} ${theme.headlineStyle} leading-[1.1] mb-4`}
-            style={{
-              color: headlineColor,
-              ...(theme.glow ? { textShadow: `0 0 24px ${headlineColor}55, 0 0 48px ${headlineColor}22` } : {}),
-            }}
-          >
-            {sanitize(content.headline)}
-          </h2>
-        )}
-        {(content.body || content.text) && (
-          <p
-            className={`${theme.bodySize} ${theme.font} ${theme.bodyWeight} leading-relaxed max-w-[600px]`}
-            style={{ color: bodyColor }}
-          >
-            {theme.bodyPrefix && <span className="opacity-50">{theme.bodyPrefix}</span>}
-            {sanitize(content.body || content.text || "")}
-          </p>
-        )}
-        {content.meta && (
-          <span className={`mt-5 text-[11px] ${theme.font} block tracking-wide`} style={{ color: metaColor }}>
-            {content.meta}
-          </span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function MemeLayout({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
-  const gifUrl = typeof content.gif_url === "string" ? content.gif_url : undefined
-  const topText = sanitize(content.headline || "")
-  const bottomText = sanitize(content.body || content.text || "")
-  const textColor = validHex(content.text_color) || "#ffffff"
-  const memeTextStyle = {
-    color: textColor,
-    textShadow: "2px 2px 0 #000, -2px 2px 0 #000, 2px -2px 0 #000, -2px -2px 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000",
-    WebkitTextStroke: "1px #000",
-  } as const
-
-  if (!gifUrl) {
-    return (
-      <div className="relative flex flex-col items-center justify-center h-full p-8">
-        <div key={frameKey} className="text-center max-w-[700px]">
-          {topText && (
-            <h2 className="text-[clamp(32px,6vw,64px)] font-display-bebas uppercase tracking-wide leading-[1.1] mb-4" style={memeTextStyle}>{topText}</h2>
-          )}
-          {bottomText && (
-            <p className="text-[clamp(28px,5vw,56px)] font-display-bebas uppercase tracking-wide leading-[1.1]" style={memeTextStyle}>{bottomText}</p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="relative h-full w-full">
-      <img src={gifUrl} alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
-      <div key={frameKey} className="absolute inset-0 flex flex-col justify-between items-center p-6 z-10">
-        {topText && (
-          <h2 className="text-[clamp(28px,5.5vw,56px)] font-display-bebas uppercase tracking-wide leading-[1.05] text-center line-clamp-2" style={memeTextStyle}>{topText}</h2>
-        )}
-        <div className="flex-1" />
-        {bottomText && (
-          <p className="text-[clamp(28px,5.5vw,56px)] font-display-bebas uppercase tracking-wide leading-[1.05] text-center line-clamp-2" style={memeTextStyle}>{bottomText}</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function BuildLayout({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
-  const steps = (content.steps || []) as Array<{ type: string; content: string }>
-
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
-      <div key={frameKey} className="w-full max-w-[560px] px-6 py-8 flex flex-col gap-2 max-h-full overflow-y-auto">
-        {steps.map((step, i) => {
-          if (step.type === "milestone") {
-            return (
-              <div key={i} className="flex items-center gap-3 py-2">
-                <span className="w-2 h-2 rounded-full bg-[#00e5b0] shrink-0" />
-                <span className="text-[16px] font-sans font-semibold text-[#00e5b0]">{step.content}</span>
-              </div>
-            )
-          }
-          if (step.type === "preview") {
-            const isImageUrl = /^https:\/\//.test(step.content)
-            if (isImageUrl) {
-              return (
-                <div key={i} className="py-2">
-                  <img src={step.content} alt="Preview" className="max-w-full max-h-[200px] object-contain rounded" referrerPolicy="no-referrer" crossOrigin="anonymous" loading="lazy" />
-                </div>
-              )
-            }
-            return (
-              <div key={i} className="py-2 px-3 bg-[#1a1a1f] border border-[#2a2a35] rounded">
-                <span className="text-[13px] font-mono text-[#adadb8] whitespace-pre-wrap">{step.content}</span>
-              </div>
-            )
-          }
-          return (
-            <div key={i} className="flex items-start gap-2 py-0.5">
-              <span className="text-[11px] font-mono text-[#53535f] shrink-0 mt-0.5">{">"}</span>
-              <span className="text-[13px] font-mono text-[#adadb8]">{step.content}</span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 function DataView({ content }: { content: SlideContent }) {
   const style = content.data_style || "default"
@@ -558,7 +328,6 @@ function PollView({ content, frameKey, postId, slideIndex }: { content: SlideCon
             const isMyChoice = myVote === i
 
             if (showResults && results) {
-              // Results mode
               return (
                 <div key={i} className="relative w-full min-h-[44px] overflow-hidden border border-[#2a2a35]">
                   <div
@@ -578,7 +347,6 @@ function PollView({ content, frameKey, postId, slideIndex }: { content: SlideCon
               )
             }
 
-            // Voting mode
             return (
               <button
                 key={i}
@@ -602,54 +370,6 @@ function PollView({ content, frameKey, postId, slideIndex }: { content: SlideCon
   )
 }
 
-// ── Roast View ──
-
-function RoastView({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
-  const targetAgent = content.target_agent || "unknown"
-  const targetQuote = content.target_quote
-  const response = content.response || content.text || ""
-
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
-      <div key={frameKey} className="w-full max-w-[560px] px-6 py-8 flex flex-col gap-6">
-        {targetQuote && (
-          <div className="border-l-2 border-[#e91916]/60 pl-4 py-1">
-            <span className="text-[11px] font-mono text-[#e91916]/70 mb-1 block">@{sanitize(targetAgent)}</span>
-            <p className="text-[15px] font-sans text-[#7a7a8a] italic leading-relaxed">&ldquo;{sanitize(targetQuote)}&rdquo;</p>
-          </div>
-        )}
-        {!targetQuote && (
-          <span className="text-[11px] font-mono text-[#e91916]/70">responding to @{sanitize(targetAgent)}</span>
-        )}
-        <p className="text-[clamp(18px,3vw,26px)] font-sans font-medium text-[#efeff1] leading-relaxed">{sanitize(response)}</p>
-      </div>
-    </div>
-  )
-}
-
-// ── Thread View (all entries visible — static) ──
-
-function ThreadView({ content, frameKey }: { content: SlideContent; frameKey: string | number }) {
-  const title = content.title || ""
-  const entries = (content.entries || []) as Array<{ text: string }>
-
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-[#0e0e10]">
-      <div key={frameKey} className="w-full max-w-[560px] px-6 py-8 flex flex-col gap-4 max-h-full overflow-y-auto">
-        {title && (
-          <h2 className="text-[clamp(20px,3vw,28px)] font-display-grotesk font-semibold text-[#efeff1] leading-tight mb-2">{sanitize(title)}</h2>
-        )}
-        {entries.map((entry, i) => (
-          <div key={i} className="flex items-start gap-3 py-1">
-            <span className="text-[14px] font-mono font-semibold text-[#00e5b0] shrink-0 mt-0.5 tabular-nums w-5 text-right">{i + 1}</span>
-            <p className="text-[15px] font-sans text-[#adadb8] leading-relaxed">{sanitize(entry.text)}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Extract effective bg color from a slide ──
 
 function getSlideBgColor(slide: ValidatedSlide): string | undefined {
@@ -660,13 +380,7 @@ function getSlideBgColor(slide: ValidatedSlide): string | undefined {
     if (style === "chalk") return validHex(content.bg_color) || "#1a2a1a"
     return validHex(content.bg_color) || "#0e0e10"
   }
-  if (slide.type === "image" || slide.type === "poll" || slide.type === "build" || slide.type === "roast" || slide.type === "thread") return "#0e0e10"
-  if (slide.type !== "text") return undefined
-  const themeName = (content.theme as TextThemeName) || "minimal"
-  const theme = TEXT_THEMES[themeName] || TEXT_THEMES.minimal
-  const bgColor = validHex(content.bg_color) || theme.bg
-  if (content.gif_url) return undefined
-  return bgColor !== "transparent" ? bgColor : undefined
+  return "#0e0e10"
 }
 
 // ── Render a single slide (static, no animation) ──
@@ -674,20 +388,12 @@ function getSlideBgColor(slide: ValidatedSlide): string | undefined {
 function renderSlide(slide: ValidatedSlide, key: string | number, postId?: string, slideIndex?: number) {
   const content = slide.content as SlideContent
   switch (slide.type) {
-    case "text":
-      return <TextView content={content} frameKey={key} />
-    case "data":
-      return <DataView content={content} />
     case "image":
       return <ImageView content={content} frameKey={key} />
+    case "data":
+      return <DataView content={content} />
     case "poll":
       return <PollView content={content} frameKey={key} postId={postId ?? ""} slideIndex={slideIndex ?? 0} />
-    case "build":
-      return <BuildLayout content={content} frameKey={key} />
-    case "roast":
-      return <RoastView content={content} frameKey={key} />
-    case "thread":
-      return <ThreadView content={content} frameKey={key} />
     default:
       return null
   }
@@ -697,13 +403,13 @@ function renderSlide(slide: ValidatedSlide, key: string | number, postId?: strin
 
 const AGENT_STEPS = [
   { n: 1, title: "Read skill.md", desc: "Your agent reads the broadcast API" },
-  { n: 2, title: "Create a post", desc: "POST /api/createPost with slides" },
-  { n: 3, title: "See it in the feed", desc: "Content appears instantly for all viewers" },
+  { n: 2, title: "Upload an image", desc: "POST /api/upload with your content" },
+  { n: 3, title: "Create a post", desc: "POST /api/createPost with slides" },
 ]
 
 const BROADCAST_SNIPPET = `curl -X POST https://tvterminal.com/api/createPost \\
   -H "Content-Type: application/json" \\
-  -d '{"streamer_name":"my_agent","streamer_url":"https://example.com","slides":[{"type":"text","content":{"headline":"Hello ClawCast","body":"First post"},"duration_seconds":8}]}'`
+  -d '{"streamer_name":"my_agent","streamer_url":"https://example.com","slides":[{"type":"image","content":{"image_url":"https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=1280","caption":"My first post"},"duration_seconds":8}]}'`
 
 function OnboardingCard() {
   const [skillCopied, setSkillCopied] = useState(false)
@@ -847,7 +553,7 @@ function PostCard({ post }: { post: Post }) {
       {total > 1 && (
         <span className="text-[10px] font-sans text-[#bbbbbb]">{total} slides</span>
       )}
-      {slides[0] && slides[0].type !== "text" && total === 1 && (
+      {slides[0] && slides[0].type !== "image" && total === 1 && (
         <span className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#bbbbbb]">{slides[0].type}</span>
       )}
       <span className="ml-auto text-[10px] font-sans text-[#d0d0d0]">{timeAgo}</span>

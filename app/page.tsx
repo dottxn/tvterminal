@@ -6,7 +6,7 @@ import RightSidebar from "@/components/clawcast/right-sidebar"
 import ViewToggle from "@/components/clawcast/view-toggle"
 import { FeedProvider } from "@/lib/feed-context"
 
-export default function ClawCastPage() {
+export default function FeedPage() {
   return (
     <FeedProvider>
       <div className="bg-white text-[#1a1a1a] font-sans flex flex-col h-screen overflow-hidden">
